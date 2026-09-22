@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Synapse Model</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: #f4f6f9; }
+        #sidebar { width: 300px; background: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; }
+        #canvas-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        canvas { background: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        slider { width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2>Synapse Controls</h2>
+        <div class="control-group">
+            <label for="speedSlider">Particle Speed: <span id="speedVal">2</span></label>
+            <input type="range" id="speedSlider" min="0.5" max="5" step="0.1" value="2">
+        </div>
+        <div class="control-group">
+            <label for="gateSlider">Receptor Gate Open Angle: <span id="gateVal">0</span>°</label>
+            <input type="range" id="gateSlider" min="0" max="90" step="5" value="0">
+        </div>
+        <p style="font-size: 13px; color: #666;">Edit this file to build out the full biological step-by-step transmission sequence.</p>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="synapseCanvas" width="700" height="500"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('synapseCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Sliders
+        const speedSlider = document.getElementById('speedSlider');
+        const speedVal = document.getElementById('speedVal');
+        const gateSlider = document.getElementById('gateSlider');
+        const gateVal = document.getElementById('gateVal');
+
+        let particleSpeed = parseFloat(speedSlider.value);
+        let gateAngle = parseInt(gateSlider.value);
+
+        speedSlider.addEventListener('input', (e) => { particleSpeed = parseFloat(e.target.value); speedVal.textContent = e.target.value; });
+        gateSlider.addEventListener('input', (e) => { gateAngle = parseInt(e.target.value); gateVal.textContent = e.target.value; });
+
+        // Neurotransmitter particles array
+        const particles = [];
+        for(let i=0; i<30; i++) {
+            particles.push({
+                x: 100 + Math.random() * 150,
+                y: 150 + Math.random() * 200,
+                vx: (Math.random() - 0.5),
+                vy: (Math.random() - 0.5)
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Pre-synaptic Terminal (Left side arc)
+            ctx.beginPath();
+            ctx.arc(-50, 250, 300, -Math.PI/3, Math.PI/3);
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#3498db';
+            ctx.stroke();
+            ctx.fillStyle = '#e8f4fd';
+            ctx.fill();
+
+            // 2. Draw Post-synaptic Membrane (Right side arc)
+            ctx.beginPath();
+            ctx.arc(750, 250, 300, 2*Math.PI/3, 4*Math.PI/3);
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#e67e22';
+            ctx.stroke();
+            ctx.fillStyle = '#fdf2e9';
+            ctx.fill();
+
+            // 3. Draw a Moving Receptor Gate Protein
+            ctx.save();
+            ctx.translate(453, 250); // Position of receptor
+            ctx.rotate(gateAngle * Math.PI / 180);
+            ctx.fillStyle = '#9b59b6';
+            ctx.fillRect(-10, -30, 20, 60); // Draw gate door
+            ctx.restore();
+
+            // 4. Update and Draw Particles (Neurotransmitters)
+            ctx.fillStyle = '#e74c3c';
+            particles.forEach(p => {
+                p.x += p.vx * particleSpeed;
+                p.y += p.vy * particleSpeed;
+
+                // Simple boundaries to keep them near the cleft
+                if (p.x < 50 || p.x > 440) p.vx *= -1;
+                if (p.y < 50 || p.y > 450) p.vy *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
