@@ -3,105 +3,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Synapse Model</title>
+    <title>ADHD Synapse & Methylphenidate Model</title>
     <style>
         body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: #f4f6f9; }
-        #sidebar { width: 300px; background: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; }
+        #sidebar { width: 320px; background: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; }
         #canvas-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
         canvas { background: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .control-group { display: flex; flex-direction: column; gap: 5px; }
-        slider { width: 100%; }
+        input[type=range] { width: 100%; }
+        .legend { font-size: 12px; display: flex; gap: 15px; margin-top: 5px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .box-normal { width: 12px; height: 12px; background: #bdc3c7; border-radius: 2px; }
+        .box-active { width: 12px; height: 12px; background: #2980b9; border-radius: 2px; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <h2>Synapse Controls</h2>
+        <h2>ADHD Synapse Model</h2>
+        
         <div class="control-group">
-            <label for="speedSlider">Particle Speed: <span id="speedVal">2</span></label>
-            <input type="range" id="speedSlider" min="0.5" max="5" step="0.1" value="2">
+            <label for="adhdSlider">Dopamine Dysregulation (DAT Reuptake): <span id="adhdVal">70</span>%</label>
+            <input type="range" id="adhdSlider" min="0" max="100" value="70">
+            <small style="color:#7f8c8d">Higher = Excessive DAT pumps clear dopamine too quickly.</small>
         </div>
+
         <div class="control-group">
-            <label for="gateSlider">Receptor Gate Open Angle: <span id="gateVal">0</span>°</label>
-            <input type="range" id="gateSlider" min="0" max="90" step="5" value="0">
+            <label for="medSlider">Medication (DAT Inhibitor): <span id="medVal">0</span>%</label>
+            <input type="range" id="medSlider" min="0" max="100" value="0">
+            <small style="color:#7f8c8d">Higher = Blocks reuptake pumps, keeping dopamine in cleft.</small>
         </div>
-        <p style="font-size: 13px; color: #666;">Edit this file to build out the full biological step-by-step transmission sequence.</p>
+
+        <div class="legend">
+            <div class="legend-item"><div class="box-normal"></div> Normal Pattern</div>
+            <div class="legend-item"><div class="box-active"></div> Current Signal</div>
+        </div>
+
+        <p style="font-size: 13px; color: #666; margin-top: auto;">
+            Based on Methylphenidate mechanism of action: Blocking DAT restores normal post-synaptic firing frequency.
+        </p>
     </div>
 
     <div id="canvas-container">
-        <canvas id="synapseCanvas" width="700" height="500"></canvas>
+        <canvas id="synapseCanvas" width="750" height="550"></canvas>
     </div>
 
     <script>
         const canvas = document.getElementById('synapseCanvas');
         const ctx = canvas.getContext('2d');
 
-        // UI Sliders
-        const speedSlider = document.getElementById('speedSlider');
-        const speedVal = document.getElementById('speedVal');
-        const gateSlider = document.getElementById('gateSlider');
-        const gateVal = document.getElementById('gateVal');
+        const adhdSlider = document.getElementById('adhdSlider');
+        const adhdVal = document.getElementById('adhdVal');
+        const medSlider = document.getElementById('medSlider');
+        const medVal = document.getElementById('medVal');
 
-        let particleSpeed = parseFloat(speedSlider.value);
-        let gateAngle = parseInt(gateSlider.value);
+        let adhdLevel = parseFloat(adhdSlider.value) / 100; // 0 to 1
+        let medLevel = parseFloat(medSlider.value) / 100;   // 0 to 1
 
-        speedSlider.addEventListener('input', (e) => { particleSpeed = parseFloat(e.target.value); speedVal.textContent = e.target.value; });
-        gateSlider.addEventListener('input', (e) => { gateAngle = parseInt(e.target.value); gateVal.textContent = e.target.value; });
+        adhdSlider.addEventListener('input', (e) => { adhdLevel = e.target.value / 100; adhdVal.textContent = e.target.value; });
+        medSlider.addEventListener('input', (e) => { medLevel = e.target.value / 100; medVal.textContent = e.target.value; });
 
-        // Neurotransmitter particles array
-        const particles = [];
-        for(let i=0; i<30; i++) {
-            particles.push({
-                x: 100 + Math.random() * 150,
-                y: 150 + Math.random() * 200,
-                vx: (Math.random() - 0.5),
-                vy: (Math.random() - 0.5)
-            });
+        // Particles & State
+        const dopamineParticles = [];
+        const maxDopamine = 40;
+        let activeSignal = 0; // Post-synaptic activation score
+        const signalHistory = new Array(150).fill(0);
+        const normalHistory = [];
+
+        // Pre-generate benchmark "Normal Brain" line
+        for(let i=0; i<150; i++) {
+            let base = 0.5 + 0.3 * Math.sin(i * 0.1) + (Math.random() - 0.5) * 0.15;
+            normalHistory.push(Math.min(1, Math.max(0, base)));
         }
+
+        function createParticle() {
+            return {
+                x: 140 + Math.random() * 20,
+                y: 150 + Math.random() * 150,
+                vx: 1.5 + Math.random() * 2,
+                vy: (Math.random() - 0.5) * 1.5,
+                life: 1.0
+            };
+        }
+
+        // Periodically release dopamine bursts
+        let timer = 0;
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            timer++;
 
-            // 1. Draw Pre-synaptic Terminal (Left side arc)
+            // Effective reuptake efficiency (High ADHD increases reuptake, High Meds block reuptake)
+            let effectiveReuptake = Math.max(0.05, adhdLevel * (1 - medLevel * 0.85));
+
+            // Burst dopamine periodically
+            if (timer % 15 === 0 && dopamineParticles.length < maxDopamine) {
+                for(let i=0; i<3; i++) dopamineParticles.push(createParticle());
+            }
+
+            // 1. Pre-synaptic Membrane (Left side)
             ctx.beginPath();
-            ctx.arc(-50, 250, 300, -Math.PI/3, Math.PI/3);
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = '#3498db';
-            ctx.stroke();
-            ctx.fillStyle = '#e8f4fd';
+            ctx.arc(-20, 225, 200, -Math.PI/3, Math.PI/3);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#34495e';
+            ctx.fillStyle = '#ecf0f1';
             ctx.fill();
+            ctx.stroke();
 
-            // 2. Draw Post-synaptic Membrane (Right side arc)
+            // 2. DAT Reuptake Transporters (Pumps on pre-synaptic terminal)
+            const pumpCount = 5;
+            for(let i=0; i<pumpCount; i++) {
+                let py = 120 + i * 55;
+                ctx.fillStyle = (medLevel > 0.3) ? '#e74c3c' : '#95a5a6'; // Red if blocked by medication
+                ctx.fillRect(135, py, 12, 20);
+                
+                // Draw medication block icons if active
+                if (medLevel > 0.1) {
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.arc(141, py + 10, 4 * medLevel, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // 3. Post-synaptic Membrane (Right side)
             ctx.beginPath();
-            ctx.arc(750, 250, 300, 2*Math.PI/3, 4*Math.PI/3);
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = '#e67e22';
-            ctx.stroke();
-            ctx.fillStyle = '#fdf2e9';
+            ctx.arc(500, 225, 200, 2*Math.PI/3, 4*Math.PI/3);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#2c3e50';
+            ctx.fillStyle = '#ebf5fb';
             ctx.fill();
+            ctx.stroke();
 
-            // 3. Draw a Moving Receptor Gate Protein
-            ctx.save();
-            ctx.translate(453, 250); // Position of receptor
-            ctx.rotate(gateAngle * Math.PI / 180);
-            ctx.fillStyle = '#9b59b6';
-            ctx.fillRect(-10, -30, 20, 60); // Draw gate door
-            ctx.restore();
+            // Receptors on Post-synaptic side
+            let bindingHits = 0;
+            for(let i=0; i<6; i++) {
+                let ry = 100 + i * 50;
+                ctx.fillStyle = '#2980b9';
+                ctx.fillRect(340, ry, 15, 25);
+            }
 
-            // 4. Update and Draw Particles (Neurotransmitters)
-            ctx.fillStyle = '#e74c3c';
-            particles.forEach(p => {
-                p.x += p.vx * particleSpeed;
-                p.y += p.vy * particleSpeed;
+            // 4. Update and Draw Dopamine Particles
+            for(let i = dopamineParticles.length - 1; i >= 0; i--) {
+                let p = dopamineParticles[i];
+                p.x += p.vx;
+                p.y += p.vy;
 
-                // Simple boundaries to keep them near the cleft
-                if (p.x < 50 || p.x > 440) p.vx *= -1;
-                if (p.y < 50 || p.y > 450) p.vy *= -1;
+                // Reuptake pull back into presynaptic neuron
+                if (p.x > 180 && Math.random() < effectiveReuptake * 0.12) {
+                    p.vx = -3; // Pull back into DAT pump
+                }
 
+                // Check binding with receptors on post-synaptic side
+                if (p.x >= 340 && p.x <= 355) {
+                    bindingHits++;
+                }
+
+                // Remove out of bounds or reabsorbed particles
+                if (p.x < 120 || p.x > 360 || p.y < 50 || p.y > 400) {
+                    dopamineParticles.splice(i, 1);
+                    continue;
+                }
+
+                // Draw Dopamine particle
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+                ctx.fillStyle = '#f1c40f';
                 ctx.fill();
-            });
+                ctx.strokeStyle = '#f39c12';
+                ctx.stroke();
+            }
+
+            // 5. Update Signal Output
+            let currentSignalVal = Math.min(1, bindingHits * 0.3);
+            signalHistory.push(currentSignalVal);
+            signalHistory.shift();
+
+            // 6. Draw Live Spiking Graph (Bottom Section)
+            const graphX = 50;
+            const graphY = 430;
+            const graphW = 650;
+            const graphH = 90;
+
+            // Graph background
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(graphX, graphY, graphW, graphH);
+            ctx.strokeStyle = '#bdc3c7';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(graphX, graphY, graphW, graphH);
+
+            // Labels
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '12px sans-serif';
+            ctx.fillText("Post-Synaptic Dopamine Signaling (Spike Frequency)", graphX, graphY - 8);
+
+            // Draw Normal Baseline (Light Gray Line)
+            ctx.beginPath();
+            ctx.strokeStyle = '#bdc3c7';
+            ctx.lineWidth = 2;
+            for(let i=0; i<graphW; i++) {
+                let normIdx = Math.floor((i / graphW) * normalHistory.length);
+                let val = normalHistory[normIdx];
+                let yPos = graphY + graphH - (val * (graphH - 10)) - 5;
+                if (i === 0) ctx.moveTo(graphX + i, yPos);
+                else ctx.lineTo(graphX + i, yPos);
+            }
+            ctx.stroke();
+
+            // Draw Active State Line (Blue Line)
+            ctx.beginPath();
+            ctx.strokeStyle = '#2980b9';
+            ctx.lineWidth = 2.5;
+            let step = graphW / signalHistory.length;
+            for(let i=0; i<signalHistory.length; i++) {
+                let val = signalHistory[i];
+                let yPos = graphY + graphH - (val * (graphH - 10)) - 5;
+                if (i === 0) ctx.moveTo(graphX, yPos);
+                else ctx.lineTo(graphX + i * step, yPos);
+            }
+            ctx.stroke();
 
             requestAnimationFrame(draw);
         }
