@@ -80,8 +80,8 @@
             return {
                 x: 140 + Math.random() * 20,
                 y: 150 + Math.random() * 150,
-                vx: 1.5 + Math.random() * 2,
-                vy: (Math.random() - 0.5) * 1.5,
+                vx: 1 + Math.random(),
+                vy: (Math.random() - 0.5),
                 life: 1.0
             };
         }
@@ -151,7 +151,7 @@
 
                 // Reuptake pull back into presynaptic neuron
                 if (p.x > 180 && Math.random() < effectiveReuptake * 0.12) {
-                    p.vx = -3; // Pull back into DAT pump
+                    p.vx = -1; // Pull back into DAT pump
                 }
 
                 // Check binding with receptors on post-synaptic side
