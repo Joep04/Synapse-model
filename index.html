@@ -4,38 +4,91 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dopamine & methylphenidate models</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f6f7f9;--panel:#fff;--ink:#1c2430;--mute:#5b6675;--line:#d9dee5;--da:#1f6feb;--mph:#d6336c;--curve:#1c2430}
-@media (prefers-color-scheme:dark){:root{--bg:#12161c;--panel:#1a2029;--ink:#e8edf3;--mute:#98a3b3;--line:#2c3441;--da:#58a6ff;--mph:#ff6b9d;--curve:#e8edf3}}
+:root{
+  --bg:#e8edee;--panel:#f8faf9;--ink:#12262c;--mute:#5a6e74;--line:#c9d4d6;
+  --da:#0b7a75;--mph:#6d3fc0;--curve:#12262c;
+  --side:#12262c;--side-ink:#e6f0ef;--side-mute:#8fa5a9;--side-da:#3fc1b8;--side-mph:#a98bff;
+  --serif:"Fraunces",Georgia,serif;--sans:"Instrument Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0c1518;--panel:#15252a;--ink:#e6f0ef;--mute:#8fa5a9;--line:#27393d;
+  --da:#3fc1b8;--mph:#a98bff;--curve:#e6f0ef;--side:#091014;
+}}
 *{box-sizing:border-box}
-body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--ink);display:grid;grid-template-columns:280px 1fr;min-height:100vh}
-aside{position:sticky;top:0;height:100vh;padding:24px;background:var(--panel);border-right:1px solid var(--line)}
-aside h1{font-size:1.1rem;margin:0 0 24px}
-.ctl{margin-bottom:28px}
-.ctl label{display:flex;justify-content:space-between;font-weight:600;margin-bottom:8px}
-.ctl output{font-variant-numeric:tabular-nums;color:var(--mute);font-weight:400}
-input[type=range]{width:100%}
-#da{accent-color:var(--da)} #mph{accent-color:var(--mph)}
-.note{font-size:.85rem;color:var(--mute)}
-main{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;padding:24px;align-content:start}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
-.card h2{font-size:1rem;margin:0 0 2px}
-.card p{margin:0 0 10px;font-size:.85rem;color:var(--mute)}
-canvas{width:100%;height:260px;display:block}
-@media (max-width:800px){body{grid-template-columns:1fr}aside{position:static;height:auto}main{grid-template-columns:1fr}}
+body{margin:0;font:16px/1.55 var(--sans);background:var(--bg);color:var(--ink);display:grid;grid-template-columns:320px 1fr;min-height:100vh}
+
+/* sidebar */
+aside{position:sticky;top:0;height:100vh;padding:32px 28px;background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;gap:30px;overflow:auto}
+aside h1{font:600 1.35rem/1.2 var(--serif);margin:0}
+aside h1 span{display:block;font:400 .85rem var(--sans);color:var(--side-mute);margin-top:6px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;font-weight:500;margin-bottom:10px}
+.ctl output{font:600 1.7rem var(--serif);font-variant-numeric:tabular-nums}
+.ctl output small{font:400 .8rem var(--sans);color:var(--side-mute);margin-left:4px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.18);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--c);border:3px solid var(--side);box-shadow:0 0 0 2px var(--c);cursor:grab}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--c);border:3px solid var(--side);box-shadow:0 0 0 2px var(--c);cursor:grab}
+input[type=range]:focus-visible{outline:2px solid var(--c);outline-offset:8px}
+#da{--c:var(--side-da)} #mph{--c:var(--side-mph)}
+.readout{margin-top:auto;padding-top:22px;border-top:1px solid rgba(255,255,255,.15)}
+.readout .lbl{color:var(--side-mute);font-size:.85rem}
+.readout .big{font:600 3rem/1.1 var(--serif);font-variant-numeric:tabular-nums}
+.readout .big small{font:400 1rem var(--sans);color:var(--side-mute)}
+.readout .sub{margin-top:14px;font-size:.95rem}
+.readout .sub b{font-family:var(--serif);font-size:1.2rem}
+
+/* content */
+.content{padding:28px 36px;min-width:0}
+nav{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:26px}
+nav button{font:500 1rem var(--sans);color:var(--mute);background:none;border:0;padding:8px 0 12px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--da)}
+nav button:focus-visible{outline:2px solid var(--da);outline-offset:2px}
+#models{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:22px}
+.card{background:var(--panel);border-radius:6px;padding:20px 22px 12px}
+.card h2{font:600 1.1rem var(--serif);margin:0 0 4px}
+.card p{margin:0 0 12px;font-size:.88rem;color:var(--mute);max-width:60ch}
+canvas{width:100%;height:270px;display:block}
+#about{max-width:68ch}
+#about h2{font:600 1.5rem var(--serif);margin:36px 0 8px}
+#about h2:first-child{margin-top:0}
+#about p{margin:0 0 1em}
+[hidden]{display:none!important}
+@media (max-width:860px){
+  body{grid-template-columns:1fr}
+  aside{position:static;height:auto}
+  .readout{margin-top:0}
+  .content{padding:20px 16px}
+  #models{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
 <aside>
-  <h1>Dopamine & methylphenidate</h1>
+  <h1>Dopamine & methylphenidate<span>Synaptic uptake models</span></h1>
   <div class="ctl"><label for="da">Dopamine release <output id="daOut"></output></label>
     <input id="da" type="range" min="0" max="90" step="1" value="40"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
     <input id="mph" type="range" min="0" max="50" step="0.5" value="10"></div>
-  <p class="note">Both sliders feed all four models. Each model lives in its own file in <code>models/</code>.</p>
+  <div class="readout">
+    <div class="lbl">Steady-state dopamine</div>
+    <div class="big" id="ssOut"></div>
+    <div class="sub">Receptor occupancy <b id="occOut"></b></div>
+  </div>
 </aside>
-<main id="models"></main>
 
+<div class="content">
+  <nav role="tablist">
+    <button role="tab" id="tab-models" aria-selected="true" aria-controls="models">Models</button>
+    <button role="tab" id="tab-about" aria-selected="false" aria-controls="about">About the models</button>
+  </nav>
+  <main id="models" role="tabpanel"></main>
+  <article id="about" role="tabpanel" hidden></article>
+</div>
+
+<script src="content.js"></script>
 <script>
 /* ---- Shared core: sliders, constants, helpers, model registry ---- */
 const PKPD = (() => {
@@ -49,31 +102,45 @@ const PKPD = (() => {
 
   function plot(canvas, o) {
     const dpr = window.devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+    if (!W) return;
     canvas.width = W * dpr; canvas.height = H * dpr;
     const g = canvas.getContext('2d'); g.scale(dpr, dpr);
     const css = getComputedStyle(document.documentElement), col = n => css.getPropertyValue(n).trim();
-    const m = { l: 52, r: 14, t: 12, b: 40 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const m = { l: 54, r: 14, t: 12, b: 42 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
     const X = x => m.l + x / o.xmax * pw, Y = y => m.t + ph - Math.min(y, o.ymax) / o.ymax * ph;
-    g.font = '12px system-ui'; g.fillStyle = col('--mute'); g.strokeStyle = col('--line');
+    g.font = '12px ' + col('--sans'); g.fillStyle = col('--mute'); g.strokeStyle = col('--line'); g.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = o.ymax * i / 4, x = o.xmax * i / 4;
       g.beginPath(); g.moveTo(m.l, Y(y)); g.lineTo(W - m.r, Y(y)); g.stroke();
-      g.textAlign = 'right'; g.fillText(+y.toPrecision(3), m.l - 6, Y(y) + 4);
-      g.textAlign = 'center'; g.fillText(+x.toPrecision(3), X(x), H - m.b + 16);
+      g.textAlign = 'right'; g.fillText(+y.toPrecision(3), m.l - 8, Y(y) + 4);
+      g.textAlign = 'center'; g.fillText(+x.toPrecision(3), X(x), H - m.b + 18);
     }
     g.fillText(o.xlabel, m.l + pw / 2, H - 6);
-    g.save(); g.translate(12, m.t + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
-    if (o.hline != null) { g.strokeStyle = col('--da'); g.setLineDash([5, 4]); g.beginPath(); g.moveTo(m.l, Y(o.hline)); g.lineTo(W - m.r, Y(o.hline)); g.stroke(); g.setLineDash([]); }
-    g.strokeStyle = col('--curve'); g.lineWidth = 2; g.beginPath();
+    g.save(); g.translate(13, m.t + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
+    // area under curve
+    g.beginPath(); g.moveTo(X(o.x[0]), Y(0));
+    o.x.forEach((x, i) => g.lineTo(X(x), Y(o.y[i]))); g.lineTo(X(o.x[o.x.length - 1]), Y(0)); g.closePath();
+    g.globalAlpha = .09; g.fillStyle = col('--da'); g.fill(); g.globalAlpha = 1;
+    if (o.hline != null) { g.strokeStyle = col('--da'); g.lineWidth = 1.5; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(m.l, Y(o.hline)); g.lineTo(W - m.r, Y(o.hline)); g.stroke(); g.setLineDash([]); }
+    g.strokeStyle = col('--curve'); g.lineWidth = 2.5; g.lineJoin = 'round'; g.beginPath();
     o.x.forEach((x, i) => i ? g.lineTo(X(x), Y(o.y[i])) : g.moveTo(X(x), Y(o.y[i]))); g.stroke();
     if (o.marker && isFinite(o.marker.x) && o.marker.x <= o.xmax) {
-      g.fillStyle = col('--mph'); g.beginPath(); g.arc(X(o.marker.x), Y(o.marker.y), 5, 0, 7); g.fill();
+      const px = X(o.marker.x), py = Y(o.marker.y);
+      g.fillStyle = col('--panel'); g.beginPath(); g.arc(px, py, 8, 0, 7); g.fill();
+      g.fillStyle = col('--mph'); g.beginPath(); g.arc(px, py, 5.5, 0, 7); g.fill();
     }
   }
   const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
 
   function register(model) { models.push(model); }
-  function redraw() { models.forEach(m => m.draw(m.canvas, { ...params }, PKPD)); }
+  function redraw() { models.forEach(m => m.canvas && m.draw(m.canvas, { ...params }, PKPD)); readouts(); }
+  function readouts() {
+    const ss = steadyState(params.da, params.mph);
+    document.getElementById('ssOut').innerHTML = isFinite(ss) ? `${Math.round(ss)} <small>nM</small>` : `unbounded`;
+    document.getElementById('occOut').textContent = isFinite(ss) ? `${(100 * ss / (ss + consts.Kd)).toFixed(0)}%` : '100%';
+  }
+
+  function paragraphs(t) { return t.trim().split(/\n\s*\n/).map(p => `<p>${p.trim()}</p>`).join(''); }
 
   function init() {
     const main = document.getElementById('models');
@@ -82,13 +149,28 @@ const PKPD = (() => {
       c.innerHTML = `<h2>${m.title}</h2><p>${m.description}</p><canvas></canvas>`;
       main.appendChild(c); m.canvas = c.querySelector('canvas');
     });
+    // About tab, filled from content.js
+    document.getElementById('about').innerHTML =
+      paragraphs(CONTENT.intro) + CONTENT.models.map(x => `<h2>${x.title}</h2>${paragraphs(x.text)}`).join('');
+    // tabs
+    const tabs = { models: ['tab-models', 'models'], about: ['tab-about', 'about'] };
+    Object.entries(tabs).forEach(([k, [btn, panel]]) => {
+      document.getElementById(btn).addEventListener('click', () => {
+        Object.values(tabs).forEach(([b, p]) => {
+          document.getElementById(b).setAttribute('aria-selected', b === btn);
+          document.getElementById(p).hidden = p !== panel;
+        });
+        redraw();
+      });
+    });
     const bind = (id, key, unit, out) => {
       const el = document.getElementById(id), o = document.getElementById(out);
-      const upd = () => { params[key] = +el.value; o.textContent = `${el.value} ${unit}`; redraw(); };
+      const upd = () => { params[key] = +el.value; o.innerHTML = `${el.value}<small>${unit}</small>`; redraw(); };
       el.addEventListener('input', upd); upd();
     };
     bind('da', 'da', 'nM/s', 'daOut'); bind('mph', 'mph', 'ng/mL', 'mphOut');
     window.addEventListener('resize', redraw);
+    if (document.fonts) document.fonts.ready.then(redraw);
   }
   return { consts, params, kApp, uptake, steadyState, plot, linspace, register, init };
 })();
