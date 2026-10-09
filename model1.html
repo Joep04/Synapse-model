@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
+<body><canvas id="c"></canvas>
+<script>
+const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
+let P = K.params, W = 0, H = 0, orbs = [], last = performance.now(), acc = 0;
+const NR = 6, NT = 5, busy = Array(NR).fill(false);
+const col = {};
+K.onUpdate(p => { P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n)); });
+
+function fit() {
+  const d = devicePixelRatio || 1; W = c.clientWidth; H = c.clientHeight;
+  if (c.width !== Math.round(W * d) || c.height !== Math.round(H * d)) { c.width = W * d; c.height = H * d; }
+  g.setTransform(d, 0, 0, d, 0, 0);
+}
+const datX = i => W * (0.08 + 0.84 * i / (NT - 1)), recX = i => W * (0.12 + 0.76 * i / (NR - 1));
+
+function step(dt, preY, postY, b) {
+  acc += P.da / 4 * dt;
+  while (acc >= 1) { acc--; if (orbs.length < 350) orbs.push({ x: W * (0.04 + 0.92 * Math.random()), y: preY + 5, vx: 0, vy: 25, r: -1, t: 0 }); }
+  const damp = Math.exp(-4 * dt);
+  orbs = orbs.filter(o => {
+    if (o.r >= 0) { o.t -= dt; if (o.t > 0) return true; busy[o.r] = false; o.r = -1; o.vy = -30; return true; }
+    o.vx = (o.vx + (Math.random() - .5) * 1500 * dt) * damp; o.vy = (o.vy + (Math.random() - .5) * 1500 * dt) * damp;
+    o.x += o.vx * dt; o.y += o.vy * dt;
+    if (o.x < 3 || o.x > W - 3) { o.vx *= -1; o.x = Math.min(W - 3, Math.max(3, o.x)); }
+    if (o.y < preY + 4) { o.vy = Math.abs(o.vy); o.y = preY + 4; }
+    if (o.y > postY - 4) { o.vy = -Math.abs(o.vy); o.y = postY - 4; }
+    if (o.y < preY + 14) for (let i = 0; i < NT; i++)
+      if (Math.abs(o.x - datX(i)) < 12 && Math.random() < (1 - b) * dt * 6) return false;
+    if (o.y > postY - 14) for (let i = 0; i < NR; i++)
+      if (!busy[i] && Math.abs(o.x - recX(i)) < 10 && Math.random() < dt * 4) {
+        busy[i] = true; o.r = i; o.x = recX(i); o.y = postY - 7; o.t = 0.5 + Math.random() * 0.8; break;
+      }
+    return true;
+  });
+}
+
+function draw(preY, postY, b) {
+  g.clearRect(0, 0, W, H);
+  g.globalAlpha = .12; g.fillStyle = col['--da']; g.fillRect(0, 0, W, preY);
+  g.fillStyle = col['--ink']; g.globalAlpha = .07; g.fillRect(0, postY, W, H - postY); g.globalAlpha = 1;
+  g.strokeStyle = col['--ink']; g.lineWidth = 2; g.beginPath();
+  g.moveTo(0, preY); g.lineTo(W, preY); g.moveTo(0, postY); g.lineTo(W, postY); g.stroke();
+  g.strokeStyle = col['--da']; g.globalAlpha = .45; g.lineWidth = 1.5;
+  for (let i = 0; i < 9; i++) { g.beginPath(); g.arc(W * (0.08 + 0.105 * i), preY * (0.3 + 0.35 * ((i * 5) % 3) / 2), 9, 0, 7); g.stroke(); }
+  g.globalAlpha = 1;
+  for (let i = 0; i < NT; i++) {   // dopamine transporters (violet dot = blocked by methylphenidate)
+    g.fillStyle = col['--ink']; g.globalAlpha = .75; g.fillRect(datX(i) - 6, preY - 6, 12, 12); g.globalAlpha = 1;
+    g.fillStyle = col['--mph']; g.globalAlpha = Math.min(1, b * 1.3);
+    g.beginPath(); g.arc(datX(i), preY + 11, 4.5, 0, 7); g.fill(); g.globalAlpha = 1;
+  }
+  for (let i = 0; i < NR; i++) {   // receptors
+    const x = recX(i);
+    g.fillStyle = busy[i] ? col['--da'] : col['--mute']; g.fillRect(x - 5, postY - 9, 10, 9);
+    if (busy[i]) { g.strokeStyle = col['--da']; g.lineWidth = 1.5; g.beginPath(); g.arc(x, postY - 7, 11, 0, 7); g.stroke(); }
+  }
+  g.fillStyle = col['--da'];
+  orbs.forEach(o => { g.beginPath(); g.arc(o.x, o.y, 3.3, 0, 7); g.fill(); });
+  g.font = '11px ' + col['--sans']; g.fillStyle = col['--mute']; g.textAlign = 'left';
+  g.fillText('Presynaptic terminal', 8, 16); g.fillText('Postsynaptic neuron', 8, H - 8);
+}
+
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  fit();
+  if (W && col['--da']) {
+    const preY = H * 0.3, postY = H * 0.74, mn = P.mph * K.consts.ngToNM, b = mn / (mn + K.consts.Ki);
+    step(dt, preY, postY, b); draw(preY, postY, b);
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script></body></html>

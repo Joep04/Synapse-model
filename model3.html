@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
+<body><canvas id="c"></canvas>
+<script>
+const c = document.getElementById("c"), K = PKPD;
+K.onUpdate(p => {
+  const dt = 0.05, T = 30, xs = [], ys = []; let C = 0;
+  for (let t = 0; t <= T; t += dt) { xs.push(t); ys.push(C); C += dt * (p.da - K.uptake(C, p.mph)); }
+  K.plot(c, { x: xs, y: ys, xmax: T, ymax: 2000, xlabel: 'Time (s)', ylabel: 'Dopamine (nM)' });
+});
+</script></body></html>

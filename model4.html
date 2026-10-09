@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
+<body><canvas id="c"></canvas>
+<script>
+const c = document.getElementById("c"), K = PKPD;
+K.onUpdate(p => {
+  const xs = K.linspace(0, 2000, 200), occ = C => C / (C + K.consts.Kd), ss = K.steadyState(p.da, p.mph);
+  K.plot(c, { x: xs, y: xs.map(occ), xmax: 2000, ymax: 1,
+    xlabel: 'Extracellular dopamine (nM)', ylabel: 'Occupancy (fraction)', marker: { x: ss, y: occ(ss) } });
+});
+</script></body></html>

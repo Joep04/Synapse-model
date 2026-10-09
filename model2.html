@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
+<body><canvas id="c"></canvas>
+<script>
+const c = document.getElementById("c"), K = PKPD;
+K.onUpdate(p => {
+  const xs = K.linspace(0, 2000, 200);
+  K.plot(c, { x: xs, y: xs.map(C => K.uptake(C, p.mph)), xmax: 2000, ymax: 100,
+    xlabel: 'Extracellular dopamine (nM)', ylabel: 'Uptake (nM/s)',
+    hline: p.da, marker: { x: K.steadyState(p.da, p.mph), y: p.da } });
+});
+</script></body></html>
