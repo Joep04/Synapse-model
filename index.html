@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dopamine & methylphenidate models</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1c2430;--mute:#5b6675;--line:#d9dee5;--da:#1f6feb;--mph:#d6336c;--curve:#1c2430}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--panel:#1a2029;--ink:#e8edf3;--mute:#98a3b3;--line:#2c3441;--da:#58a6ff;--mph:#ff6b9d;--curve:#e8edf3}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--ink);display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+aside{position:sticky;top:0;height:100vh;padding:24px;background:var(--panel);border-right:1px solid var(--line)}
+aside h1{font-size:1.1rem;margin:0 0 24px}
+.ctl{margin-bottom:28px}
+.ctl label{display:flex;justify-content:space-between;font-weight:600;margin-bottom:8px}
+.ctl output{font-variant-numeric:tabular-nums;color:var(--mute);font-weight:400}
+input[type=range]{width:100%}
+#da{accent-color:var(--da)} #mph{accent-color:var(--mph)}
+.note{font-size:.85rem;color:var(--mute)}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;padding:24px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.card h2{font-size:1rem;margin:0 0 2px}
+.card p{margin:0 0 10px;font-size:.85rem;color:var(--mute)}
+canvas{width:100%;height:260px;display:block}
+@media (max-width:800px){body{grid-template-columns:1fr}aside{position:static;height:auto}main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<aside>
+  <h1>Dopamine & methylphenidate</h1>
+  <div class="ctl"><label for="da">Dopamine release <output id="daOut"></output></label>
+    <input id="da" type="range" min="0" max="90" step="1" value="40"></div>
+  <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
+    <input id="mph" type="range" min="0" max="50" step="0.5" value="10"></div>
+  <p class="note">Both sliders feed all four models. Each model lives in its own file in <code>models/</code>.</p>
+</aside>
+<main id="models"></main>
+
+<script>
+/* ---- Shared core: sliders, constants, helpers, model registry ---- */
+const PKPD = (() => {
+  const consts = { Vmax: 100, Km: 200, Ki: 100, ngToNM: 4.28, Kd: 500 }; // nM/s, nM, nM, nM per ng/mL, nM
+  const params = { da: 40, mph: 10 };           // da = release rate (nM/s), mph = plasma conc (ng/mL)
+  const models = [];
+
+  const kApp = mph => consts.Km * (1 + (mph * consts.ngToNM) / consts.Ki);
+  const uptake = (C, mph) => consts.Vmax * C / (kApp(mph) + C);
+  const steadyState = (R, mph) => R >= consts.Vmax ? Infinity : R * kApp(mph) / (consts.Vmax - R);
+
+  function plot(canvas, o) {
+    const dpr = window.devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+    const css = getComputedStyle(document.documentElement), col = n => css.getPropertyValue(n).trim();
+    const m = { l: 52, r: 14, t: 12, b: 40 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const X = x => m.l + x / o.xmax * pw, Y = y => m.t + ph - Math.min(y, o.ymax) / o.ymax * ph;
+    g.font = '12px system-ui'; g.fillStyle = col('--mute'); g.strokeStyle = col('--line');
+    for (let i = 0; i <= 4; i++) {
+      const y = o.ymax * i / 4, x = o.xmax * i / 4;
+      g.beginPath(); g.moveTo(m.l, Y(y)); g.lineTo(W - m.r, Y(y)); g.stroke();
+      g.textAlign = 'right'; g.fillText(+y.toPrecision(3), m.l - 6, Y(y) + 4);
+      g.textAlign = 'center'; g.fillText(+x.toPrecision(3), X(x), H - m.b + 16);
+    }
+    g.fillText(o.xlabel, m.l + pw / 2, H - 6);
+    g.save(); g.translate(12, m.t + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
+    if (o.hline != null) { g.strokeStyle = col('--da'); g.setLineDash([5, 4]); g.beginPath(); g.moveTo(m.l, Y(o.hline)); g.lineTo(W - m.r, Y(o.hline)); g.stroke(); g.setLineDash([]); }
+    g.strokeStyle = col('--curve'); g.lineWidth = 2; g.beginPath();
+    o.x.forEach((x, i) => i ? g.lineTo(X(x), Y(o.y[i])) : g.moveTo(X(x), Y(o.y[i]))); g.stroke();
+    if (o.marker && isFinite(o.marker.x) && o.marker.x <= o.xmax) {
+      g.fillStyle = col('--mph'); g.beginPath(); g.arc(X(o.marker.x), Y(o.marker.y), 5, 0, 7); g.fill();
+    }
+  }
+  const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+
+  function register(model) { models.push(model); }
+  function redraw() { models.forEach(m => m.draw(m.canvas, { ...params }, PKPD)); }
+
+  function init() {
+    const main = document.getElementById('models');
+    models.forEach(m => {
+      const c = document.createElement('section'); c.className = 'card';
+      c.innerHTML = `<h2>${m.title}</h2><p>${m.description}</p><canvas></canvas>`;
+      main.appendChild(c); m.canvas = c.querySelector('canvas');
+    });
+    const bind = (id, key, unit, out) => {
+      const el = document.getElementById(id), o = document.getElementById(out);
+      const upd = () => { params[key] = +el.value; o.textContent = `${el.value} ${unit}`; redraw(); };
+      el.addEventListener('input', upd); upd();
+    };
+    bind('da', 'da', 'nM/s', 'daOut'); bind('mph', 'mph', 'ng/mL', 'mphOut');
+    window.addEventListener('resize', redraw);
+  }
+  return { consts, params, kApp, uptake, steadyState, plot, linspace, register, init };
+})();
+</script>
+<script src="models/model1.js"></script>
+<script src="models/model2.js"></script>
+<script src="models/model3.js"></script>
+<script src="models/model4.js"></script>
+<script>PKPD.init();</script>
+</body>
+</html>
