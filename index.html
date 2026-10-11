@@ -19,7 +19,7 @@
   --da:#3fc1b8;--mph:#a98bff;--curve:#e6f0ef;--side:#091014;
 }}
 *{box-sizing:border-box}
-body{margin:0;font:16px/1.55 var(--sans);background:var(--bg);color:var(--ink);display:grid;grid-template-columns:320px 1fr;min-height:100vh}
+body{margin:0;font:16px/1.55 var(--sans);background:var(--bg);color:var(--ink);display:grid;grid-template-columns:320px 1fr;height:100vh;overflow:hidden}
 aside{position:sticky;top:0;height:100vh;padding:32px 28px;background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;gap:30px;overflow:auto}
 aside h1{font:600 1.35rem/1.2 var(--serif);margin:0}
 aside h1 span{display:block;font:400 .85rem var(--sans);color:var(--side-mute);margin-top:6px}
@@ -37,27 +37,29 @@ input[type=range]:focus-visible{outline:2px solid var(--c);outline-offset:8px}
 .readout .big small{font:400 1rem var(--sans);color:var(--side-mute)}
 .readout .sub{margin-top:14px;font-size:.95rem}
 .readout .sub b{font-family:var(--serif);font-size:1.2rem}
-.content{padding:28px 36px;min-width:0}
-nav{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:26px}
-nav button{font:500 1rem var(--sans);color:var(--mute);background:none;border:0;padding:8px 0 12px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+.content{padding:18px 28px 20px;min-width:0;height:100vh;display:flex;flex-direction:column}
+nav{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:16px;flex:none}
+nav button{font:500 1rem var(--sans);color:var(--mute);background:none;border:0;padding:4px 0 10px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
 nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--da)}
 nav button:focus-visible{outline:2px solid var(--da);outline-offset:2px}
-#models{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:22px}
-.card{background:var(--panel);border-radius:6px;padding:20px 22px 12px}
-.card h2{font:600 1.1rem var(--serif);margin:0 0 4px}
-.card p{margin:0 0 12px;font-size:.88rem;color:var(--mute);max-width:60ch}
-iframe{width:100%;border:0;display:block}
-#about{max-width:68ch}
+#models{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;flex:1;min-height:0}
+.card{background:var(--panel);border-radius:6px;padding:14px 18px 8px;display:flex;flex-direction:column;min-height:0;min-width:0}
+.card h2{font:600 1.05rem var(--serif);margin:0 0 2px}
+.card p{margin:0 0 6px;font-size:.8rem;line-height:1.35;color:var(--mute)}
+iframe{width:100%;border:0;display:block;flex:1;min-height:0}
+#about{max-width:68ch;overflow-y:auto;flex:1;min-height:0}
 #about h2{font:600 1.5rem var(--serif);margin:36px 0 8px}
 #about h2:first-child{margin-top:0}
 #about p{margin:0 0 1em}
 [hidden]{display:none!important}
 @media (max-width:860px){
-  body{grid-template-columns:1fr}
+  body{grid-template-columns:1fr;height:auto;overflow:visible}
   aside{position:static;height:auto}
   .readout{margin-top:0}
-  .content{padding:20px 16px}
-  #models{grid-template-columns:1fr}
+  .content{padding:20px 16px;height:auto;display:block}
+  #models{grid-template-columns:1fr;grid-template-rows:none;gap:16px}
+  iframe{flex:none;height:300px}
+  #about{overflow:visible}
 }
 </style>
 </head>
@@ -117,7 +119,7 @@ const paragraphs = t => t.trim().split(/\n\s*\n/).map(p => `<p>${p.trim()}</p>`)
 const main = document.getElementById('models');
 MODELS.forEach(m => {
   const c = document.createElement('section'); c.className = 'card';
-  c.innerHTML = `<h2>${m.title}</h2><p>${m.caption}</p><iframe src="${m.file}" style="height:${m.height}px" title="${m.title}"></iframe>`;
+  c.innerHTML = `<h2>${m.title}</h2><p>${m.caption}</p><iframe src="${m.file}" title="${m.title}"></iframe>`;
   main.appendChild(c);
   const f = c.querySelector('iframe'); frames.push(f);
   f.addEventListener('load', () => send(f));
