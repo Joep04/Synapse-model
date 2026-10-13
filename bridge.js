@@ -2,7 +2,7 @@
 // Model files only need:  PKPD.onUpdate(p => { ...draw using p.da, p.mph... });
 const PKPD = (() => {
   const consts = { Vmax: 100, Km: 200, Ki: 100, ngToNM: 4.28, Kd: 500 }; // nM/s, nM, nM, nM per ng/mL, nM
-  const params = { da: 40, mph: 10 };      // da = release rate (nM/s), mph = plasma conc (ng/mL)
+  const params = { da: 40, mph: 10, shared: {} };      // da = release rate (nM/s), mph = plasma conc (ng/mL)
   const subs = [];
   const kApp = mph => consts.Km * (1 + (mph * consts.ngToNM) / consts.Ki);
   const uptake = (C, mph) => consts.Vmax * C / (kApp(mph) + C);
@@ -11,6 +11,13 @@ const PKPD = (() => {
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const emit = () => subs.forEach(f => f({ ...params }));
   const onUpdate = f => { subs.push(f); };
+  // Publish values to the other models (via index.html), e.g. PKPD.share({ perfMedicated: 0.8 }).
+  // Other models read them as p.shared.<name> inside onUpdate.
+  let lastShared = '';
+  const share = values => {
+    const j = JSON.stringify(values); if (j === lastShared) return; lastShared = j;
+    if (window.parent !== window) parent.postMessage({ type: 'pkpd-share', values }, '*');
+  };
 
   function plot(canvas, o) {
     const dpr = window.devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
@@ -58,5 +65,5 @@ const PKPD = (() => {
     addEventListener('resize', emit);
     addEventListener('load', emit);
   }
-  return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate };
+  return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate, share };
 })();
