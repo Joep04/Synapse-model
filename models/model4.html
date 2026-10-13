@@ -2,10 +2,99 @@
 <html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
 <body><canvas id="c"></canvas>
 <script>
-const c = document.getElementById("c"), K = PKPD;
+const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
+// Performance (0-1) comes from model 2 via PKPD.share({ perfUnmedicated, perfMedicated }), same as model 3.
+const FALLBACK = { base: 0.45, med: 0.75 };
+// Keep these four equal to model3.html so the ring fades in step with the valley:
+const DMAX = 0.6, TAU = 4, SLOPE = 1.2, LEN = 1.0;
+const ACRIT = SLOPE / (2 * Math.PI / LEN) ** 2;   // valley depth at which the memory is lost in model 3
+
+const N = 48,        // excitatory neurons on the ring
+      I0 = 0.3,      // background input
+      INH = 0.5,     // global inhibition
+      TAUN = 0.05,   // neuron time constant (s)
+      SIG = 0.15,    // input noise (makes the bump drift)
+      JC = 1.12,     // recurrent excitation at which the bump can no longer be held
+      JGAIN = 0.063, // recurrent excitation per unit of valley depth above critical
+      LOST = 0.1,    // bump strength below which the memory counts as lost
+      PAUSE = 2, TMAX = 30;
+
+const TH = Array.from({ length: N }, (_, i) => 2 * Math.PI * i / N), COS = TH.map(Math.cos), SIN = TH.map(Math.sin);
+let P = K.params, W = 0, H = 0, last = performance.now(), perf = { ...FALLBACK }, sim = null;
+const col = {};
+const randn = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+const clamp = v => Math.min(1, Math.max(0, +v));
+
+function newTrial() {
+  sim = { t: 0, wait: 0, th0: Math.random() * 2 * Math.PI,
+    rings: [perf.base, perf.med].map(p => ({ p, r: Float64Array.from({ length: N }, () => I0 / (1 + INH) * (1 + 0.1 * Math.random())), sm: 0, psi: 0, lost: null })) };
+}
 K.onUpdate(p => {
-  const xs = K.linspace(0, 2000, 200), occ = C => C / (C + K.consts.Kd), ss = K.steadyState(p.da, p.mph);
-  K.plot(c, { x: xs, y: xs.map(occ), xmax: 2000, ymax: 1,
-    xlabel: 'Extracellular dopamine (nM)', ylabel: 'Occupancy (fraction)', marker: { x: ss, y: occ(ss) } });
+  P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n));
+  const s = p.shared || {};
+  const nb = clamp(s.perfUnmedicated ?? FALLBACK.base), nm = clamp(s.perfMedicated ?? FALLBACK.med);
+  if (!sim || nb !== perf.base || nm !== perf.med) { perf = { base: nb, med: nm }; newTrial(); }
 });
+c.addEventListener('click', () => newTrial());
+
+function fit() {
+  const d = devicePixelRatio || 1; W = c.clientWidth; H = c.clientHeight;
+  if (c.width !== Math.round(W * d) || c.height !== Math.round(H * d)) { c.width = W * d; c.height = H * d; }
+  g.setTransform(d, 0, 0, d, 0, 0);
+}
+
+function step(dt) {
+  if (sim.rings.every(R => R.lost !== null) || sim.t > TMAX) { sim.wait += dt; if (sim.wait > PAUSE) { newTrial(); return; } }
+  const n = Math.ceil(dt / 0.005), h = dt / n;
+  for (let k = 0; k < n; k++) {
+    sim.t += h;
+    sim.rings.forEach(R => {
+      const depth = DMAX * R.p * Math.exp(-sim.t / TAU), J = JC + JGAIN * (depth / ACRIT - 1);   // recurrent excitation decays like the valley
+      let cc = 0, ss = 0, m = 0;
+      for (let j = 0; j < N; j++) { cc += R.r[j] * COS[j]; ss += R.r[j] * SIN[j]; m += R.r[j]; }
+      cc *= 2 / N; ss *= 2 / N; m /= N;
+      for (let i = 0; i < N; i++) {
+        let hh = I0 + J * (cc * COS[i] + ss * SIN[i]) - INH * m + SIG * randn();
+        if (sim.t < 0.5) hh += Math.exp(2 * (Math.cos(TH[i] - sim.th0) - 1));      // cue: the memory to store
+        R.r[i] += h / TAUN * (-R.r[i] + Math.min(1, Math.max(0, hh)));
+      }
+      const m1 = Math.hypot(cc, ss); R.sm += h / 0.3 * (m1 - R.sm); R.psi = Math.atan2(ss, cc);
+      if (R.lost === null && sim.t > 0.8 && R.sm < LOST) R.lost = sim.t;
+    });
+  }
+}
+
+function draw() {
+  g.clearRect(0, 0, W, H);
+  const rad = Math.max(20, Math.min(W / 4 - 22, H / 2 - 36)), cy = H / 2 + 12;
+  const pos = (cx, a, rr) => [cx + rr * Math.sin(a), cy - rr * Math.cos(a)];
+  [['Unmedicated', col['--mute']], ['Medicated', col['--mph']]].forEach(([name, color], k) => {
+    const R = sim.rings[k], cx = W * (0.25 + 0.5 * k);
+    g.strokeStyle = col['--line']; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, rad, 0, 7); g.stroke();
+    g.fillStyle = color;
+    for (let i = 0; i < N; i++) {                       // neurons: size and opacity = firing rate
+      const [x, y] = pos(cx, TH[i], rad), f = R.r[i];
+      g.globalAlpha = 0.15 + 0.85 * f; g.beginPath(); g.arc(x, y, rad * (0.03 + 0.055 * f), 0, 7); g.fill();
+    }
+    g.globalAlpha = 1;
+    const [tx, ty] = pos(cx, sim.th0, rad * 1.2);        // the cued (to-be-remembered) angle
+    g.strokeStyle = col['--ink']; g.lineWidth = 2; g.beginPath(); g.moveTo(...pos(cx, sim.th0, rad * 1.1)); g.lineTo(tx, ty); g.stroke();
+    if (R.sm > 0.06) {                                   // arrow = remembered angle, length = bump strength
+      const [ax, ay] = pos(cx, R.psi, rad * 0.8 * Math.min(1, R.sm / 0.5));
+      g.strokeStyle = color; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(ax, ay); g.stroke();
+      g.beginPath(); g.arc(ax, ay, 4, 0, 7); g.fill();
+    }
+    g.font = '11px ' + col['--sans']; g.textAlign = 'center'; g.fillStyle = color; g.beginPath(); g.arc(cx - 40, 14, 4.5, 0, 7); g.fill();
+    g.fillStyle = col['--mute']; g.textAlign = 'left'; g.fillText(name, cx - 32, 18);
+    g.textAlign = 'center'; g.fillText(R.lost === null ? 'holding' : 'memory lost at ' + R.lost.toFixed(1) + ' s', cx, 34);
+  });
+  g.fillStyle = col['--mute']; g.textAlign = 'right'; g.fillText(Math.min(sim.t, TMAX).toFixed(1) + ' s', W - 10, 18);
+}
+
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; fit();
+  if (W && sim && col['--da']) { step(dt); draw(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 </script></body></html>
