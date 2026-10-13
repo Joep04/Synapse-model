@@ -10,9 +10,9 @@ const DMAX = 0.6,   // hill/valley height at performance = 1
       TAU = 4,      // decay time of the hills and valleys (s)
       LEN = 1.0,    // sine wavelength (1 = valleys in the middle and at both screen edges)
       SLOPE = 1.2,  // overall downhill slope to the sides: the ball rolls out once the hills have vanished
-      FORCE = 2.1,  // gravity: higher = faster rolling back and forth
+      FORCE = 1.8,  // gravity: higher = faster rolling back and forth
       DAMP = 0.4,   // friction: lower = swings longer
-      NOISE = 0.7,  // shaking strength
+      NOISE = 0.4,  // shaking strength
       PAUSE = 2, TMAX = 30;
 
 let P = K.params, W = 0, H = 0, last = performance.now(), perf = { ...FALLBACK }, sim = null;
