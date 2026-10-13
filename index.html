@@ -42,10 +42,21 @@ nav{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:16px
 nav button{font:500 1rem var(--sans);color:var(--mute);background:none;border:0;padding:4px 0 10px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
 nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--da)}
 nav button:focus-visible{outline:2px solid var(--da);outline-offset:2px}
-#models{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;flex:1;min-height:0}
-.card{background:var(--panel);border-radius:6px;padding:14px 18px 8px;display:flex;flex-direction:column;min-height:0;min-width:0}
-.card h2{font:600 1.05rem var(--serif);margin:0 0 2px}
-.card p{margin:0 0 6px;font-size:.8rem;line-height:1.35;color:var(--mute)}
+#models{position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;flex:1;min-height:0}
+.card{position:relative;background:var(--panel);border-radius:6px;padding:14px 18px 8px;display:flex;flex-direction:column;min-height:0;min-width:0}
+.card h2{font:600 1.05rem var(--serif);margin:0 0 2px;padding-right:34px}
+.card p{padding-right:34px;margin:0 0 6px;font-size:.8rem;line-height:1.35;color:var(--mute)}
+/* info button + popup */
+.info{position:absolute;top:12px;right:14px;z-index:2;width:26px;height:26px;padding:0;border-radius:50%;border:1.5px solid var(--mute);background:none;color:var(--mute);font:italic 600 .95rem/1 var(--serif);cursor:pointer;display:grid;place-items:center}
+.info:hover,.info[aria-expanded=true]{border-color:var(--da);color:var(--da)}
+.info:focus-visible{outline:2px solid var(--da);outline-offset:2px}
+.card.open{box-shadow:0 0 0 2px var(--da)}
+#popup{position:absolute;top:0;bottom:0;width:calc(50% - 8px);z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 36px rgba(0,0,0,.28);padding:20px 22px;overflow-y:auto}
+#popup.right{left:calc(50% + 8px)} #popup.left{left:0}
+#popup h2{font:600 1.25rem var(--serif);margin:0 0 10px;padding-right:30px}
+#popup p{margin:0 0 1em}
+#popup .close{position:absolute;top:8px;right:12px;background:none;border:0;color:var(--mute);font-size:1.5rem;line-height:1;cursor:pointer}
+#popup .close:hover{color:var(--ink)}
 iframe{width:100%;border:0;display:block;flex:1;min-height:0}
 #about{max-width:68ch;overflow-y:auto;flex:1;min-height:0}
 #about h2{font:600 1.5rem var(--serif);margin:36px 0 8px}
@@ -60,6 +71,7 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
   #models{grid-template-columns:1fr;grid-template-rows:none;gap:16px}
   iframe{flex:none;height:300px}
   #about{overflow:visible}
+  #popup,#popup.left,#popup.right{position:fixed;top:auto;bottom:12px;left:12px;right:12px;width:auto;max-height:55vh}
 }
 </style>
 </head>
@@ -121,14 +133,36 @@ function readouts() {
 }
 const paragraphs = t => t.trim().split(/\n\s*\n/).map(p => `<p>${p.trim()}</p>`).join('');
 
-const main = document.getElementById('models');
+const main = document.getElementById('models'), cards = [], btns = [];
 MODELS.forEach(m => {
   const c = document.createElement('section'); c.className = 'card';
-  c.innerHTML = `<h2>${m.title}</h2><p>${m.caption}</p><iframe src="${m.file}" title="${m.title}"></iframe>`;
-  main.appendChild(c);
+  c.innerHTML = `<h2>${m.title}</h2><p>${m.caption}</p><button class="info" aria-label="Info about ${m.title}" aria-expanded="false" title="About this model">i</button><iframe src="${m.file}" title="${m.title}"></iframe>`;
+  main.appendChild(c); cards.push(c); btns.push(c.querySelector('.info'));
   const f = c.querySelector('iframe'); frames.push(f);
   f.addEventListener('load', () => send(f));
 });
+
+// Info popup: shows this model's text from content.js, over the other column so the model itself stays visible
+const popup = document.createElement('div'); popup.id = 'popup'; popup.hidden = true; popup.setAttribute('role', 'dialog');
+main.appendChild(popup);
+let openIdx = -1;
+function closeInfo() {
+  if (openIdx < 0) return;
+  popup.hidden = true; cards[openIdx].classList.remove('open'); btns[openIdx].setAttribute('aria-expanded', 'false'); openIdx = -1;
+}
+function openInfo(i) {
+  if (openIdx === i) { closeInfo(); return; }
+  closeInfo();
+  const x = CONTENT.models[i] || { title: MODELS[i].title, text: '' };
+  popup.innerHTML = `<button class="close" aria-label="Close">&times;</button><h2>${x.title}</h2>${paragraphs(x.text)}`;
+  popup.className = i % 2 === 0 ? 'right' : 'left';
+  popup.hidden = false; popup.scrollTop = 0;
+  cards[i].classList.add('open'); btns[i].setAttribute('aria-expanded', 'true'); openIdx = i;
+  popup.querySelector('.close').addEventListener('click', closeInfo);
+}
+btns.forEach((b, i) => b.addEventListener('click', () => openInfo(i)));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo(); });
+
 
 document.getElementById('about').innerHTML =
   paragraphs(CONTENT.intro) + CONTENT.models.map(x => `<h2>${x.title}</h2>${paragraphs(x.text)}`).join('');
@@ -136,6 +170,7 @@ document.getElementById('about').innerHTML =
 const tabs = [['tab-models', 'models'], ['tab-about', 'about']];
 tabs.forEach(([btn, panel]) => document.getElementById(btn).addEventListener('click', () => {
   tabs.forEach(([b, p]) => { document.getElementById(b).setAttribute('aria-selected', b === btn); document.getElementById(p).hidden = p !== panel; });
+  closeInfo();
   sendAll();
 }));
 
