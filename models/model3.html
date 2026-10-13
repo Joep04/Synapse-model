@@ -2,10 +2,89 @@
 <html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
 <body><canvas id="c"></canvas>
 <script>
-const c = document.getElementById("c"), K = PKPD;
+const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
+// Performance (0-1) comes from model 2 via PKPD.share({ perfUnmedicated, perfMedicated }).
+// These fallbacks are used until model 2 provides values.
+const FALLBACK = { base: 0.45, med: 0.75 };
+const DMAX = 1.0,   // valley depth at performance = 1
+      TAU = 5,      // decay time of the valley (s)
+      TILT = 0.3,   // slope of the landscape: the ball rolls right once the valley is gone
+      WIDTH = 0.18, // valley width
+      NOISE = 0.3,  // shaking strength
+      MOB = 1.2, PAUSE = 2, TMAX = 30;
+
+let P = K.params, W = 0, H = 0, last = performance.now(), perf = { ...FALLBACK }, sim = null;
+const col = {};
+const V  = (x, d) => -d * Math.exp(-x * x / (2 * WIDTH * WIDTH)) - TILT * x;
+const dV = (x, d) => d * x / (WIDTH * WIDTH) * Math.exp(-x * x / (2 * WIDTH * WIDTH)) - TILT;
+const randn = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+const clamp = v => Math.min(1, Math.max(0, +v));
+
+function newTrial() {
+  sim = { t: 0, wait: 0, balls: [perf.base, perf.med].map(p => ({ d0: DMAX * p, x: 0, lost: null })) };
+}
 K.onUpdate(p => {
-  const dt = 0.05, T = 30, xs = [], ys = []; let C = 0;
-  for (let t = 0; t <= T; t += dt) { xs.push(t); ys.push(C); C += dt * (p.da - K.uptake(C, p.mph)); }
-  K.plot(c, { x: xs, y: ys, xmax: T, ymax: 2000, xlabel: 'Time (s)', ylabel: 'Dopamine (nM)' });
+  P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n));
+  const s = p.shared || {};
+  const nb = clamp(s.perfUnmedicated ?? FALLBACK.base), nm = clamp(s.perfMedicated ?? FALLBACK.med);
+  if (!sim || nb !== perf.base || nm !== perf.med) { perf = { base: nb, med: nm }; newTrial(); }
 });
+c.addEventListener('click', () => newTrial());
+
+function fit() {
+  const d = devicePixelRatio || 1; W = c.clientWidth; H = c.clientHeight;
+  if (c.width !== Math.round(W * d) || c.height !== Math.round(H * d)) { c.width = W * d; c.height = H * d; }
+  g.setTransform(d, 0, 0, d, 0, 0);
+}
+const X = x => W / 2 + x * W * 0.46;
+const Y = v => H * 0.14 + (0.45 - v) / 1.65 * H * 0.76;
+
+function step(dt) {
+  if (sim.balls.every(b => b.lost !== null) || sim.t > TMAX) { sim.wait += dt; if (sim.wait > PAUSE) newTrial(); return; }
+  const n = Math.ceil(dt * 240), h = dt / n;
+  for (let i = 0; i < n; i++) {
+    sim.t += h;
+    sim.balls.forEach(b => {
+      if (b.x >= 1) return;
+      const d = b.d0 * Math.exp(-sim.t / TAU);
+      b.x = Math.min(1, Math.max(-1, b.x - MOB * dV(b.x, d) * h + NOISE * Math.sqrt(h) * randn()));
+      if (b.lost === null && b.x > 0.45) b.lost = sim.t;
+    });
+  }
+}
+
+function terrain(d, color, fillA) {
+  g.beginPath(); g.moveTo(X(-1), H);
+  for (let x = -1; x <= 1.0001; x += 0.01) g.lineTo(X(x), Y(V(x, d)));
+  g.lineTo(X(1), H); g.closePath(); g.globalAlpha = fillA; g.fillStyle = color; g.fill();
+  g.globalAlpha = 1; g.strokeStyle = color; g.lineWidth = 2.5; g.lineJoin = 'round'; g.beginPath();
+  for (let x = -1; x <= 1.0001; x += 0.01) x < -0.999 ? g.moveTo(X(x), Y(V(x, d))) : g.lineTo(X(x), Y(V(x, d)));
+  g.stroke();
+}
+function ball(b, d, color, r, alpha) {
+  const px = X(b.x), py = Y(V(b.x, d)) - r * 0.9;
+  g.globalAlpha = alpha; g.fillStyle = color; g.beginPath(); g.arc(px, py, r, 0, 7); g.fill();
+  g.globalAlpha = .35 * alpha; g.fillStyle = '#fff'; g.beginPath(); g.arc(px - r * .3, py - r * .3, r * .35, 0, 7); g.fill();
+  g.globalAlpha = 1;
+}
+
+function draw() {
+  g.clearRect(0, 0, W, H);
+  const [u, m] = sim.balls, du = u.d0 * Math.exp(-sim.t / TAU), dm = m.d0 * Math.exp(-sim.t / TAU), r = Math.max(6, H * 0.035);
+  terrain(du, col['--mute'], .15); terrain(dm, col['--da'], .15);
+  ball(u, du, col['--mute'], r * .9, .9); ball(m, dm, col['--mph'], r, 1);
+  g.font = '11px ' + col['--sans']; g.textAlign = 'left';
+  [['Unmedicated', col['--mute'], u], ['Medicated', col['--mph'], m]].forEach(([name, color, b], i) => {
+    g.fillStyle = color; g.beginPath(); g.arc(14, 14 + i * 16, 4.5, 0, 7); g.fill();
+    g.fillStyle = col['--mute']; g.fillText(`${name}  ·  ${b.lost === null ? 'holding' : 'memory lost at ' + b.lost.toFixed(1) + ' s'}`, 26, 18 + i * 16);
+  });
+  g.textAlign = 'right'; g.fillText(sim.t.toFixed(1) + ' s', W - 10, 18);
+}
+
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; fit();
+  if (W && sim && col['--da']) { step(dt); draw(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 </script></body></html>
