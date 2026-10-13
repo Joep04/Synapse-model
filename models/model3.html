@@ -12,7 +12,7 @@ const DMAX = 0.6,   // hill/valley height at performance = 1
       SLOPE = 1.2,  // overall downhill slope to the sides: the ball rolls out once the hills have vanished
       FORCE = 1.8,  // gravity: higher = faster rolling back and forth
       DAMP = 0.6,   // friction: lower = swings longer
-      NOISE = 0.2,  // shaking strength
+      NOISE = 1.4,  // shaking strength
       PAUSE = 2, TMAX = 30;
 
 let P = K.params, W = 0, H = 0, last = performance.now(), perf = { ...FALLBACK }, sim = null;
