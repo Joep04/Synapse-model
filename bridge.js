@@ -2,19 +2,20 @@
 // Model files only need:  PKPD.onUpdate(p => { ...draw using p.da, p.mph... });
 const PKPD = (() => {
   const consts = { Vmax: 100, Km: 200, Ki: 100, ngToNM: 4.28, Kd: 500 }; // nM/s, nM, nM, nM per ng/mL, nM
-  const params = { da: 1, mph: 5, profile: 'adhd', shared: {} };   // da = baseline dopamine (0-4), mph = ng/mL      // da = release rate (nM/s), mph = plasma conc (ng/mL)
+  const params = { da: 1, mph: 3, profile: 'adhd', shared: {} };   // da = baseline dopamine (0-4), mph = ng/mL      // da = release rate (nM/s), mph = plasma conc (ng/mL)
   const subs = [];
   const kApp = mph => consts.Km * (1 + (mph * consts.ngToNM) / consts.Ki);
   const uptake = (C, mph) => consts.Vmax * C / (kApp(mph) + C);
   const steadyState = (R, mph) => R >= consts.Vmax ? Infinity : R * kApp(mph) / (consts.Vmax - R);
   // ---- Paper-based model (values from the original model 2) ----
   const PAPER = { DA_MAX: 4.0, OPTIMUM: 2.0, CURVE_WIDTH: 0.64, BOOST: 0.0, MPH: { ec50: 4.5, eMax: 1.0, maxInc: 2.5 } };
-  // start = baseline dopamine the profile sets on the slider (= 2.0 + the profile's shift in the original model 2:
-  // ADHD -1.0, Anxiety +0.2 stress +0.6 surge). wm = curve width factor (tolerance).
+  // start = baseline dopamine and mph = methylphenidate (ng/mL) the profile sets on the sliders
+  // (start = 2.0 + the profile's shift in the original model 2: ADHD -1.0, Anxiety +0.2 stress +0.6 surge).
+  // wm = curve width factor (tolerance).
   const PROFILES = {
-    typical: { name: 'Typical',           start: 2.0, wm: 1.0, mph: 0},
-    adhd:    { name: 'ADHD',              start: 1.0, wm: 1.0, mph: 3},
-    anxiety: { name: 'Anxiety or stress', start: 2.8, wm: 0.875, mph: 0}
+    typical: { name: 'Typical',           start: 2.0, mph: 0, wm: 1.0 },
+    adhd:    { name: 'ADHD',              start: 1.0, mph: 3, wm: 1.0 },
+    anxiety: { name: 'Anxiety or stress', start: 2.8, mph: 0, wm: 0.875 }
   };
   const clamp = (v, a, c) => Math.min(c, Math.max(a, v));
   const performance = (da, w) => 100 * Math.exp(-Math.pow(da - PAPER.OPTIMUM, 2) / (2 * w * w));
