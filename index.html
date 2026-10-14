@@ -89,7 +89,6 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
     <input id="da" type="range" min="0" max="4" step="0.01" value="1"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
     <input id="mph" type="range" min="0" max="40" step="0.5" value="3"></div>
-    <div class="sub">DAT occupancy <b id="occOut"></b></div>
   </div>
 </aside>
 
@@ -111,7 +110,7 @@ const MODELS = [
   { file: 'models/model1.html', title: '1. Synapse',                          caption: 'Dopamine released into the cleft; transporters (squares) take it back up (reuptake). Purple = blocked.', height: 340 },
   { file: 'models/model2.html', title: '2. Performance (inverted U)', caption: 'Dopamine and methylphenidate set working memory performance on an inverted U. The effects of this can be seen in models 3 and 4.', height: 270 },
   { file: 'models/model4.html', title: '3. Ring attractor', caption: 'Neurons on a ring hold the memory as a bump of neuron firing. Recurrent excitation decays like the valley in model 4; the bump fades and the memory is lost.', height: 270 },
-  { file: 'models/model3.html', title: '4. Valley model', caption: 'Ball in a valley: blue = unmedicated, purple = medicated. The valley decays; when the ball rolls out, the memory is lost. Click to restart.', height: 270 }
+  { file: 'models/model3.html', title: '4. Valley model', caption: 'Ball in a valley: The valley decays, when the ball rolls out, the memory is lost. Click to restart.', height: 270 }
 ];
 
 const K = PKPD, params = { da: 1, mph: 3, profile: 'adhd' };
@@ -202,7 +201,6 @@ function applyProfile(key) {
   });
 }
 applyProfile(params.profile);
-
 // Deselect the profile when the user moves a slider.
 // e.isTrusted is false for the events applyProfile() fires itself, so choosing a tab doesn't deselect it.
 ['da', 'mph'].forEach(id => document.getElementById(id).addEventListener('input', e => {
