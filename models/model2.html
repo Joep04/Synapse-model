@@ -1,281 +1,219 @@
-#!/usr/bin/env python3
-"""
-Interactive inverted-U model: dopamine, working memory and methylphenidate (MPH).
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dopamine, working memory and MPH</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1f1f1e; --muted:#5f5e5a; --grid:#e1e0d9; --card:#f3f2ee; --tab:#e6e5df; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1a1a19; --fg:#ecebe5; --muted:#b4b2a9; --grid:#3a3a37; --card:#262624; --tab:#33332f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:20px; background:var(--bg); color:var(--fg);
+         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:1400px; margin:0 auto; }
+  h1 { font-size:20px; font-weight:600; margin:0 0 14px; }
+  #tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  #tabs button { padding:9px 18px; border:1px solid var(--grid); border-radius:8px; background:var(--tab);
+                 color:var(--fg); font-size:14px; cursor:pointer; }
+  #tabs button.active { color:#fff; font-weight:600; border-color:transparent; }
+  .plots { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:16px; }
+  canvas { width:100%; height:480px; display:block; }
+  .card { background:var(--card); border-radius:10px; padding:14px 16px; margin-top:16px; }
+  #metrics { font-size:15px; font-weight:600; margin-bottom:6px; }
+  #desc { font-size:14px; color:var(--muted); line-height:1.6; }
+  .sliders { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px 32px; margin-top:16px; }
+  .sliders label { display:flex; justify-content:space-between; font-size:14px; margin-bottom:4px; }
+  .sliders input[type=range] { width:100%; }
+  #reset { padding:8px 16px; border:1px solid var(--grid); border-radius:8px; background:var(--tab);
+           color:var(--fg); cursor:pointer; font-size:14px; margin-top:16px; }
+  .note { font-size:12px; color:var(--muted); margin-top:16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Inverted-U model: dopamine, working memory and methylphenidate (MPH)</h1>
+  <div id="tabs"></div>
 
-Opens a window with profile tabs at the top (Typical, ADHD, Anxiety or stress)
-and three sliders:
-  Person:        baseline dopamine, extra boost
-  Methylphenidate: plasma concentration (ng/mL)
-The individual optimum and curve width are fixed (see OPTIMUM and CURVE_WIDTH).
+  <div class="plots">
+    <canvas id="c1" role="img" aria-label="Inverted U curve of working memory performance against dopamine level"></canvas>
+    <canvas id="c2" role="img" aria-label="Dose-response curve of performance against MPH concentration"></canvas>
+  </div>
 
-Install (once):   pip install numpy matplotlib
-Run:              python dopamine_mph_model.py
+  <div class="card">
+    <div id="metrics"></div>
+    <div id="desc"></div>
+  </div>
 
-Options:
-  --profile typical|adhd|anxiety   starting profile (default: adhd)
-  --mph 5                          starting concentration in ng/mL
-  --no-window                      only save a PNG (no window)
-  --save file.png                  name of the PNG
+  <div class="sliders">
+    <div><label for="baseline"><span>Baseline dopamine</span><span id="baseline-v"></span></label>
+      <input type="range" id="baseline" min="0" max="4" step="0.01" value="2"></div>
+    <div><label for="boost"><span>Extra boost</span><span id="boost-v"></span></label>
+      <input type="range" id="boost" min="-1.2" max="1.2" step="0.05" value="0"></div>
+    <div><label for="mph"><span>MPH (ng/mL)</span><span id="mph-v"></span></label>
+      <input type="range" id="mph" min="0" max="40" step="0.5" value="5"></div>
+  </div>
+  <button id="reset">Reset</button>
 
-Scale: relative dopamine from 0 to 4. A typical person sits at 2.0, which is
-also their optimum. This is an illustrative model, not a diagnostic or
-medical tool.
-"""
-import argparse
-import sys
-import textwrap
+  <p class="note">Illustrative model, not a diagnostic or medical tool. Scale: relative dopamine from 0 to 4; a typical person sits at 2.0, which is also their optimum.</p>
+</div>
 
-try:
-    import numpy as np
-    import matplotlib
-    import matplotlib.pyplot as plt
-    from matplotlib.widgets import Slider, Button
-except ImportError:
-    sys.exit("numpy and matplotlib are required. Install them with:\n"
-             "    pip install numpy matplotlib")
+<script>
+const DA_MAX = 4.0, OPTIMUM = 2.0, CURVE_WIDTH = 0.64;
+const MPH = { ec50: 4.5, eMax: 1.0, maxInc: 2.5 };
+const DEFAULTS = { baseline: 2.0, boost: 0.0, mph: 5.0 };
 
-DA_MAX = 4.0
-OPTIMUM = 2.0        # dopamine level where working memory peaks
-CURVE_WIDTH = 0.64   # tolerance of the curve (smaller = narrower peak)
+const PROFILES = {
+  typical: { name: "Typical", color: "#898781", dl: 0.0, db: 0.0, wm: 1.0,
+    text: "No profile effect: only the sliders count. Without medication this person sits at the optimum, so extra stimulation is more likely to hurt than help." },
+  adhd: { name: "ADHD", color: "#2a78d6", dl: -1.0, db: 0.0, wm: 1.0,
+    text: "Lower prefrontal catecholamine signaling: the starting level shifts down onto the left slope of the curve. Raise the MPH concentration to see medication move the person toward the optimum and then past it." },
+  anxiety: { name: "Anxiety or stress", color: "#c94f8a", dl: 0.2, db: 0.6, wm: 0.875,
+    text: "Anxiety adds a stress surge of catecholamines and reduces tolerance. The person already sits close to or past the optimum, so extra stimulation quickly turns negative. Norepinephrine matters at least as much as dopamine here, so this is a simplification." }
+};
+let current = "adhd";
 
-
-# ---------------------------------------------------------------------------
-# 1. MPH function (unchanged apart from the language)
-# ---------------------------------------------------------------------------
-def calculate_dopamine_shift(concentration_mph, baseline_da=1.0, e_max=1.0,
-                             ec50=4.5, max_da_increase=2.5):
-    """
-    Calculates dopamine output from the methylphenidate concentration
-    using an Emax / Hill saturation curve.
-
-    :param concentration_mph: Plasma concentration in ng/mL
-    :param baseline_da: Default dopamine level without medication (e.g. 1.0)
-    :param e_max: Maximum occupancy fraction (1.0 = 100%)
-    :param ec50: Concentration for 50% DAT occupancy (average ~4.5 ng/mL)
-    :param max_da_increase: Maximum factor by which dopamine can increase
-    :return: The estimated current dopamine level
-    """
-    # Step 1: calculate DAT occupancy (0.0 to 1.0)
-    dat_occupancy = (e_max * concentration_mph) / (ec50 + concentration_mph)
-
-    # Step 2: translate occupancy into a dopamine increase
-    current_da = baseline_da + (max_da_increase * dat_occupancy)
-
-    return current_da
-
-
-# ---------------------------------------------------------------------------
-# 2. Model
-# ---------------------------------------------------------------------------
-# dl = added to the starting level, db = added to the boost,
-# wm = multiplier of the curve width
-PROFILES = {
-    "typical": {
-        "name": "Typical", "color": "#898781", "dl": 0.0, "db": 0.0, "wm": 1.0,
-        "text": "No profile effect: only the sliders count. Without "
-                "medication this person sits at the optimum, so extra "
-                "stimulation is more likely to hurt than help."},
-    "adhd": {
-        "name": "ADHD", "color": "#2a78d6", "dl": -1.0, "db": 0.0, "wm": 1.0,
-        "text": "Lower prefrontal catecholamine signaling: the starting level "
-                "shifts down onto the left slope of the curve. Raise the MPH "
-                "concentration to see medication move the person toward the "
-                "optimum and then past it."},
-    "anxiety": {
-        "name": "Anxiety or stress", "color": "#c94f8a",
-        "dl": 0.2, "db": 0.6, "wm": 0.875,
-        "text": "Anxiety adds a stress surge of catecholamines and reduces "
-                "tolerance. The person already sits close to or past the "
-                "optimum, so extra stimulation quickly turns negative. "
-                "Norepinephrine matters at least as much as dopamine here, "
-                "so this is a simplification."},
+// Same formula as calculate_dopamine_shift in the Python script
+function calculateDopamineShift(conc, baseDa, eMax, ec50, maxInc) {
+  const occupancy = (eMax * conc) / (ec50 + conc);
+  return baseDa + maxInc * occupancy;
+}
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const performance = (da, w) => 100 * Math.exp(-Math.pow(da - OPTIMUM, 2) / (2 * w * w));
+function zone(da, w) {
+  const d = da - OPTIMUM;
+  if (Math.abs(d) <= 0.5 * w) return "Near optimum";
+  return d < 0 ? "Under-stimulated" : "Over-stimulated";
+}
+function compute(baseline, boost, p, conc) {
+  const start = clamp(baseline + p.dl, 0, DA_MAX);
+  const daMph = calculateDopamineShift(conc, start, MPH.eMax, MPH.ec50, MPH.maxInc);
+  const after = clamp(daMph + boost + p.db, 0, DA_MAX);
+  const width = CURVE_WIDTH * p.wm;
+  return { start, after, width,
+           occupancy: (MPH.eMax * conc) / (MPH.ec50 + conc),
+           p0: performance(start, width), p1: performance(after, width) };
 }
 
-DEFAULTS = dict(baseline=2.0, boost=0.0, mph=5.0)
+const $ = id => document.getElementById(id);
+const css = () => getComputedStyle(document.documentElement);
 
-# Fixed MPH parameters (no sliders); adjust here if you want
-MPH_PARAMS = dict(ec50=4.5, e_max=1.0, max_inc=2.5)
+function plot(cv, o) {
+  const st = css(), fg = st.getPropertyValue("--fg").trim(),
+        muted = st.getPropertyValue("--muted").trim(), grid = st.getPropertyValue("--grid").trim();
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const L = 62, R = 18, T = 40, B = 54, pw = W - L - R, ph = H - T - B, YMAX = 105;
+  const X = x => L + (x / o.xmax) * pw, Y = y => T + ph - (y / YMAX) * ph;
 
+  g.font = "12px system-ui, sans-serif"; g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let y = 0; y <= 100; y += 20) {
+    g.beginPath(); g.moveTo(L, Y(y)); g.lineTo(L + pw, Y(y)); g.stroke();
+    g.fillText(String(y), L - 8, Y(y));
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (let x = 0; x <= o.xmax + 1e-9; x += o.xstep) g.fillText(String(+x.toFixed(2)), X(x), T + ph + 8);
 
-def performance(da, optimum, width):
-    """Working memory performance (0-100%) as a Gaussian around the optimum."""
-    return 100.0 * np.exp(-((da - optimum) ** 2) / (2.0 * width ** 2))
+  g.strokeStyle = muted;
+  g.strokeRect(L, T, pw, ph);
 
+  g.fillStyle = fg; g.font = "13px system-ui, sans-serif";
+  g.textAlign = "center"; g.textBaseline = "alphabetic";
+  g.fillText(o.xlabel, L + pw / 2, H - 10);
+  g.save(); g.translate(16, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
+  g.font = "600 15px system-ui, sans-serif"; g.fillText(o.title, L + pw / 2, 24);
 
-def zone(da, optimum, width):
-    d = da - optimum
-    if abs(d) <= 0.5 * width:
-        return "Near optimum"
-    return "Under-stimulated" if d < 0 else "Over-stimulated"
+  g.beginPath();
+  o.curve.forEach((pt, i) => i ? g.lineTo(X(pt.x), Y(pt.y)) : g.moveTo(X(pt.x), Y(pt.y)));
+  g.strokeStyle = o.color; g.lineWidth = 3; g.stroke();
 
+  if (o.vline !== undefined) {
+    g.setLineDash([2, 4]); g.strokeStyle = muted; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(X(o.vline), T); g.lineTo(X(o.vline), T + ph); g.stroke(); g.setLineDash([]);
+  }
+  if (o.dashed) {
+    g.setLineDash([6, 4]); g.strokeStyle = muted; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(X(o.dashed[0].x), Y(o.dashed[0].y)); g.lineTo(X(o.dashed[1].x), Y(o.dashed[1].y));
+    g.stroke(); g.setLineDash([]);
+  }
+  o.markers.forEach(m => {
+    g.fillStyle = m.color; g.beginPath();
+    if (m.shape === "circle") g.arc(X(m.x), Y(m.y), 8, 0, 2 * Math.PI);
+    else { const cx = X(m.x), cy = Y(m.y); g.moveTo(cx, cy - 10); g.lineTo(cx + 9, cy + 7); g.lineTo(cx - 9, cy + 7); g.closePath(); }
+    g.fill();
+  });
+  if (o.legend) {
+    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "12px system-ui, sans-serif";
+    o.legend.forEach((l, i) => {
+      const lx = L + 14, ly = T + 18 + i * 20;
+      g.fillStyle = l.color; g.beginPath();
+      if (l.shape === "circle") g.arc(lx, ly, 6, 0, 2 * Math.PI);
+      else { g.moveTo(lx, ly - 7); g.lineTo(lx + 7, ly + 5); g.lineTo(lx - 7, ly + 5); g.closePath(); }
+      g.fill(); g.fillStyle = fg; g.fillText(l.label, lx + 14, ly);
+    });
+  }
+}
 
-def compute(baseline, boost, profile, conc):
-    """
-    Combines person + profile + MPH concentration (conc may be a numpy array).
-    The effective starting level is passed to the MPH function as baseline_da.
-    """
-    start = float(np.clip(baseline + profile["dl"], 0.0, DA_MAX))
-    da_mph = calculate_dopamine_shift(
-        conc, baseline_da=start, e_max=MPH_PARAMS["e_max"],
-        ec50=MPH_PARAMS["ec50"], max_da_increase=MPH_PARAMS["max_inc"])
-    after = np.clip(da_mph + boost + profile["db"], 0.0, DA_MAX)
-    occupancy = (MPH_PARAMS["e_max"] * conc) / (MPH_PARAMS["ec50"] + conc)
-    width = CURVE_WIDTH * profile["wm"]
-    return {"start": start, "after": after, "occupancy": occupancy,
-            "width": width,
-            "p0": performance(start, OPTIMUM, width),
-            "p1": performance(after, OPTIMUM, width)}
+function update() {
+  const baseline = +$("baseline").value, boost = +$("boost").value, conc = +$("mph").value;
+  const p = PROFILES[current], s = compute(baseline, boost, p, conc);
+  $("baseline-v").textContent = baseline.toFixed(2);
+  $("boost-v").textContent = (boost >= 0 ? "+" : "") + boost.toFixed(2);
+  $("mph-v").textContent = conc.toFixed(1) + " ng/mL";
 
+  const curve1 = [];
+  for (let i = 0; i <= 300; i++) { const x = i * DA_MAX / 300; curve1.push({ x, y: performance(x, s.width) }); }
+  plot($("c1"), {
+    xmax: DA_MAX, xstep: 0.5, color: p.color, curve: curve1,
+    xlabel: "Dopamine (relative units)", ylabel: "Working memory performance (%)",
+    title: "Inverted U: dopamine and performance",
+    dashed: [{ x: s.start, y: s.p0 }, { x: s.after, y: s.p1 }],
+    markers: [{ x: s.start, y: s.p0, color: "#eb6834", shape: "circle" },
+              { x: s.after, y: s.p1, color: "#1baf7a", shape: "triangle" }],
+    legend: [{ label: "Starting level", color: "#eb6834", shape: "circle" },
+             { label: "After MPH and boost", color: "#1baf7a", shape: "triangle" }]
+  });
 
-# ---------------------------------------------------------------------------
-# 3. Figure with tabs and sliders
-# ---------------------------------------------------------------------------
-def build_figure(start_profile="adhd", start_mph=5.0):
-    fig = plt.figure(figsize=(14, 10))
-    ax1 = fig.add_axes([0.06, 0.35, 0.40, 0.54])
-    ax2 = fig.add_axes([0.56, 0.35, 0.41, 0.54])
-    manager = getattr(fig.canvas, "manager", None)
-    if manager is not None:
-        manager.set_window_title("Dopamine, working memory and MPH")
+  const curve2 = [];
+  for (let i = 0; i <= 160; i++) { const c = i * 0.25; curve2.push({ x: c, y: compute(baseline, boost, p, c).p1 }); }
+  plot($("c2"), {
+    xmax: 40, xstep: 5, color: p.color, curve: curve2, vline: conc,
+    xlabel: "MPH concentration (ng/mL)", ylabel: "Working memory performance (%)",
+    title: "Dose-response: " + p.name,
+    markers: [{ x: conc, y: s.p1, color: "#1baf7a", shape: "triangle" }]
+  });
 
-    t_metrics = fig.text(0.03, 0.285, "", fontsize=12, fontweight="bold",
-                         va="top")
-    t_text = fig.text(0.03, 0.245, "", fontsize=10, va="top")
+  const change = s.p1 - s.p0;
+  $("metrics").textContent = p.name + ":  performance " + Math.round(s.p0) + "% \u2192 " + Math.round(s.p1) + "% (" +
+    (change >= 0 ? "+" : "") + Math.round(change) + " points)   |   DAT occupancy " + Math.round(s.occupancy * 100) +
+    "%   |   " + zone(s.after, s.width);
+  $("desc").textContent = p.text;
 
-    def make_slider(rect, label, lo, hi, init, step, fmt="%.2f"):
-        return Slider(fig.add_axes(rect), label, lo, hi, valinit=init,
-                      valstep=step, valfmt=fmt)
+  document.querySelectorAll("#tabs button").forEach(b => {
+    const on = b.dataset.key === current;
+    b.classList.toggle("active", on);
+    b.style.background = on ? PROFILES[b.dataset.key].color : "";
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
 
-    sliders = {
-        "baseline": make_slider([0.20, 0.13, 0.26, 0.03], "Baseline dopamine",
-                                0.0, 4.0, DEFAULTS["baseline"], 0.01),
-        "boost": make_slider([0.20, 0.07, 0.26, 0.03], "Extra boost",
-                             -1.2, 1.2, DEFAULTS["boost"], 0.05),
-        "mph": make_slider([0.68, 0.13, 0.26, 0.03], "MPH (ng/mL)",
-                           0.0, 40.0, start_mph, 0.5, "%.1f"),
-    }
-
-    # Profiles as tab buttons at the top (the active tab is colored)
-    state = {"profile": start_profile}
-    tabs = {}
-    width, gap, x0 = 0.15, 0.01, 0.06
-    for n, (key, pr) in enumerate(PROFILES.items()):
-        rect = [x0 + n * (width + gap), 0.948, width, 0.04]
-        tabs[key] = Button(fig.add_axes(rect), pr["name"])
-    reset_button = Button(fig.add_axes([0.68, 0.06, 0.12, 0.04]), "Reset")
-
-    def update(_=None):
-        baseline = sliders["baseline"].val
-        boost = sliders["boost"].val
-        conc = sliders["mph"].val
-        key = state["profile"]
-        p = PROFILES[key]
-        s = compute(baseline, boost, p, conc)
-
-        # Left: the inverted U
-        ax1.clear()
-        x = np.linspace(0, DA_MAX, 300)
-        ax1.plot(x, performance(x, OPTIMUM, s["width"]), color=p["color"],
-                 lw=3)
-        ax1.plot([s["start"], s["after"]], [s["p0"], s["p1"]],
-                 color="#898781", ls="--", lw=1.4)
-        ax1.scatter(s["start"], s["p0"], s=140, color="#eb6834", marker="o",
-                    zorder=3, label="Starting level")
-        ax1.scatter(s["after"], s["p1"], s=160, color="#1baf7a", marker="^",
-                    zorder=3, label="After MPH and boost")
-        ax1.set_xlim(0, DA_MAX)
-        ax1.set_ylim(0, 105)
-        ax1.set_xlabel("Dopamine (relative units)", fontsize=11)
-        ax1.set_ylabel("Working memory performance (%)", fontsize=11)
-        ax1.set_title("Inverted U: dopamine and performance", fontsize=13)
-        ax1.legend(loc="upper left", frameon=False, fontsize=10)
-
-        # Right: dose-response for the selected profile only
-        ax2.clear()
-        concs = np.linspace(0, 40, 161)
-        ax2.plot(concs, compute(baseline, boost, p, concs)["p1"],
-                 color=p["color"], lw=3)
-        ax2.axvline(conc, color="#898781", ls=":", lw=1.2)
-        ax2.scatter(conc, s["p1"], s=160, color="#1baf7a", marker="^",
-                    zorder=3)
-        ax2.set_xlim(0, 40)
-        ax2.set_ylim(0, 105)
-        ax2.set_xlabel("MPH concentration (ng/mL)", fontsize=11)
-        ax2.set_ylabel("Working memory performance (%)", fontsize=11)
-        ax2.set_title(f"Dose-response: {p['name']}", fontsize=13)
-
-        change = float(s["p1"] - s["p0"])
-        t_metrics.set_text(
-            f"{p['name']}:  performance {float(s['p0']):.0f}% -> "
-            f"{float(s['p1']):.0f}% ({change:+.0f} points)   |   "
-            f"DAT occupancy {float(s['occupancy']) * 100:.0f}%   |   "
-            f"{zone(float(s['after']), OPTIMUM, s['width'])}")
-        t_text.set_text(textwrap.fill(p["text"], width=170))
-
-        # recolor the tabs
-        for k, b in tabs.items():
-            active = k == key
-            color = PROFILES[k]["color"] if active else "#e6e5df"
-            b.color = b.hovercolor = color
-            b.ax.set_facecolor(color)
-            b.label.set_color("white" if active else "#2c2c2a")
-            b.label.set_fontweight("bold" if active else "normal")
-        fig.canvas.draw_idle()
-
-    def choose(key):
-        state["profile"] = key
-        update()
-
-    def reset(_):
-        sliders["baseline"].set_val(DEFAULTS["baseline"])
-        sliders["boost"].set_val(DEFAULTS["boost"])
-        sliders["mph"].set_val(start_mph)
-
-    for s in sliders.values():
-        s.on_changed(update)
-    for k, b in tabs.items():
-        b.on_clicked(lambda _e, k=k: choose(k))
-    reset_button.on_clicked(reset)
-    update()
-    # return references so the widgets are not garbage collected
-    return fig, (sliders, tabs, reset_button, choose)
-
-
-# ---------------------------------------------------------------------------
-# 4. Main program
-# ---------------------------------------------------------------------------
-def main():
-    ap = argparse.ArgumentParser(description="Interactive dopamine/MPH model")
-    ap.add_argument("--profile", choices=PROFILES, default="adhd")
-    ap.add_argument("--mph", type=float, default=5.0)
-    ap.add_argument("--no-window", action="store_true")
-    ap.add_argument("--save", default="dopamine_mph_model.png")
-    # parse_known_args: also works in Spyder/Jupyter/IDLE with odd argv
-    args, _ = ap.parse_known_args()
-
-    print("Example of the MPH function (baseline 1.0):")
-    for conc in [0, 2, 5, 10, 20, 40]:
-        print(f"MPH concentration: {conc:2d} ng/mL -> Estimated dopamine "
-              f"level: {calculate_dopamine_shift(conc):.2f}")
-
-    fig, _widgets = build_figure(args.profile, args.mph)
-
-    non_interactive = matplotlib.get_backend().lower() in (
-        "agg", "pdf", "svg", "ps", "cairo", "template")
-    if args.no_window or non_interactive:
-        fig.savefig(args.save, dpi=130)
-        reason = "requested" if args.no_window else \
-            "no graphical backend available"
-        print(f"\nFigure saved as {args.save} ({reason}).")
-        return
-    try:
-        plt.show()
-    except Exception as e:  # e.g. missing tkinter/Qt
-        fig.savefig(args.save, dpi=130)
-        print(f"\nCould not open a window ({e}).")
-        print(f"Figure saved as {args.save}. Tip: pip install PyQt5, "
-              "or install tkinter.")
-
-
-if __name__ == "__main__":
-    main()
+Object.entries(PROFILES).forEach(([key, p]) => {
+  const b = document.createElement("button");
+  b.textContent = p.name; b.dataset.key = key;
+  b.addEventListener("click", () => { current = key; update(); });
+  $("tabs").appendChild(b);
+});
+["baseline", "boost", "mph"].forEach(id => $(id).addEventListener("input", update));
+$("reset").addEventListener("click", () => {
+  Object.keys(DEFAULTS).forEach(k => $(k).value = DEFAULTS[k]); update();
+});
+window.addEventListener("resize", update);
+update();
+</script>
+</body>
+</html> 
