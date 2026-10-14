@@ -2,11 +2,27 @@
 // Model files only need:  PKPD.onUpdate(p => { ...draw using p.da, p.mph... });
 const PKPD = (() => {
   const consts = { Vmax: 100, Km: 200, Ki: 100, ngToNM: 4.28, Kd: 500 }; // nM/s, nM, nM, nM per ng/mL, nM
-  const params = { da: 40, mph: 10, shared: {} };      // da = release rate (nM/s), mph = plasma conc (ng/mL)
+  const params = { da: 2, mph: 5, profile: 'adhd', shared: {} };   // da = baseline dopamine (0-4), mph = ng/mL      // da = release rate (nM/s), mph = plasma conc (ng/mL)
   const subs = [];
   const kApp = mph => consts.Km * (1 + (mph * consts.ngToNM) / consts.Ki);
   const uptake = (C, mph) => consts.Vmax * C / (kApp(mph) + C);
   const steadyState = (R, mph) => R >= consts.Vmax ? Infinity : R * kApp(mph) / (consts.Vmax - R);
+  // ---- Paper-based model (values from the original model 2) ----
+  const PAPER = { DA_MAX: 4.0, OPTIMUM: 2.0, CURVE_WIDTH: 0.64, BOOST: 0.0, MPH: { ec50: 4.5, eMax: 1.0, maxInc: 2.5 } };
+  const PROFILES = {
+    typical: { name: 'Typical',           dl: 0.0,  db: 0.0, wm: 1.0 },
+    adhd:    { name: 'ADHD',              dl: -1.0, db: 0.0, wm: 1.0 },
+    anxiety: { name: 'Anxiety or stress', dl: 0.2,  db: 0.6, wm: 0.875 }
+  };
+  const clamp = (v, a, c) => Math.min(c, Math.max(a, v));
+  const performance = (da, w) => 100 * Math.exp(-Math.pow(da - PAPER.OPTIMUM, 2) / (2 * w * w));
+  const occupancy = conc => PAPER.MPH.eMax * conc / (PAPER.MPH.ec50 + conc);
+  function compute(baseline, conc, profile) {   // start = unmedicated level, after = level on MPH
+    const p = PROFILES[profile] || PROFILES.typical, occ = occupancy(conc), width = PAPER.CURVE_WIDTH * p.wm;
+    const start = clamp(baseline + p.dl + p.db, 0, PAPER.DA_MAX);
+    const after = clamp(start + PAPER.MPH.maxInc * occ + PAPER.BOOST, 0, PAPER.DA_MAX);
+    return { start, after, width, occupancy: occ, p0: performance(start, width), p1: performance(after, width) };
+  }
   const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const emit = () => subs.forEach(f => f({ ...params }));
@@ -65,5 +81,5 @@ const PKPD = (() => {
     addEventListener('resize', emit);
     addEventListener('load', emit);
   }
-  return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate, share };
+  return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate, share, PAPER, PROFILES, performance, occupancy, compute };
 })();

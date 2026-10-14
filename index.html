@@ -23,6 +23,11 @@ body{margin:0;font:16px/1.55 var(--sans);background:var(--bg);color:var(--ink);d
 aside{position:sticky;top:0;height:100vh;padding:32px 28px;background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;gap:30px;overflow:auto}
 aside h1{font:600 1.35rem/1.2 var(--serif);margin:0}
 aside h1 span{display:block;font:400 .85rem var(--sans);color:var(--side-mute);margin-top:6px}
+.cap{font-size:.8rem;color:var(--side-mute);margin-bottom:8px}
+.profile{display:flex;flex-wrap:wrap;gap:6px}
+.profile button{font:500 .8rem var(--sans);padding:4px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:none;color:var(--side-ink);cursor:pointer}
+.profile button[aria-pressed=true]{background:var(--side-da);border-color:var(--side-da);color:var(--side)}
+.profile button:focus-visible{outline:2px solid var(--side-da);outline-offset:2px}
 .ctl label{display:flex;justify-content:space-between;align-items:baseline;font-weight:500;margin-bottom:10px}
 .ctl output{font:600 1.7rem var(--serif);font-variant-numeric:tabular-nums}
 .ctl output small{font:400 .8rem var(--sans);color:var(--side-mute);margin-left:4px}
@@ -78,14 +83,15 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
 <body>
 <aside>
   <h1>Dopamine & methylphenidate<span>Synaptic uptake models</span></h1>
-  <div class="ctl"><label for="da">Dopamine release <output id="daOut"></output></label>
-    <input id="da" type="range" min="0" max="90" step="1" value="40"></div>
+  <div><div class="cap">Profile</div><div class="profile" id="profile"></div></div>
+  <div class="ctl"><label for="da">Baseline dopamine <output id="daOut"></output></label>
+    <input id="da" type="range" min="0" max="4" step="0.01" value="2"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
-    <input id="mph" type="range" min="0" max="50" step="0.5" value="10"></div>
+    <input id="mph" type="range" min="0" max="40" step="0.5" value="5"></div>
   <div class="readout">
-    <div class="lbl">Steady-state dopamine</div>
-    <div class="big" id="ssOut"></div>
-    <div class="sub">Receptor occupancy <b id="occOut"></b></div>
+    <div class="lbl">Performance on medication</div>
+    <div class="big" id="perfOut"></div>
+    <div class="sub">Unmedicated <b id="perf0Out"></b> &middot; DAT occupancy <b id="occOut"></b></div>
   </div>
 </aside>
 
@@ -105,12 +111,12 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
 /* ---- Model list: file, card title/caption, and height. The models themselves live in models/*.html ---- */
 const MODELS = [
   { file: 'models/model1.html', title: '1. Synapse',                          caption: 'Dopamine released into the cleft; transporters (squares) take it back up. Violet = blocked.', height: 340 },
-  { file: 'models/model2.html', title: '2. DAT uptake kinetics',              caption: 'Dashed line = release rate; the crossing with the curve is steady state.', height: 270 },
+  { file: 'models/model2.html', title: '2. Performance (inverted U)', caption: 'Dopamine and methylphenidate set working memory performance on an inverted U. These values drive models 3 and 4.', height: 270 },
   { file: 'models/model3.html', title: '3. Working memory',                  caption: 'Ball in a valley: grey = unmedicated, colour = medicated. The valley decays; when the ball rolls out, the memory is lost. Click to restart.', height: 270 },
   { file: 'models/model4.html', title: '4. Ring attractor', caption: 'Neurons on a ring hold the memory as a bump of firing. Recurrent excitation decays like the valley in model 3; the bump fades and the memory is lost. Click to restart.', height: 270 }
 ];
 
-const K = PKPD, params = { da: 40, mph: 10 };
+const K = PKPD, params = { da: 2, mph: 5, profile: 'adhd' };
 const THEME = ['--panel','--ink','--mute','--line','--da','--mph','--curve','--sans'];
 const frames = [], shared = {};
 
@@ -127,9 +133,10 @@ addEventListener('message', e => {
 });
 
 function readouts() {
-  const ss = K.steadyState(params.da, params.mph);
-  document.getElementById('ssOut').innerHTML = isFinite(ss) ? `${Math.round(ss)} <small>nM</small>` : 'unbounded';
-  document.getElementById('occOut').textContent = isFinite(ss) ? `${(100 * ss / (ss + K.consts.Kd)).toFixed(0)}%` : '100%';
+  const r = K.compute(params.da, params.mph, params.profile);
+  document.getElementById('perfOut').innerHTML = `${Math.round(r.p1)}<small>%</small>`;
+  document.getElementById('perf0Out').textContent = `${Math.round(r.p0)}%`;
+  document.getElementById('occOut').textContent = `${Math.round(r.occupancy * 100)}%`;
 }
 const paragraphs = t => t.trim().split(/\n\s*\n/).map(p => `<p>${p.trim()}</p>`).join('');
 
@@ -174,11 +181,24 @@ tabs.forEach(([btn, panel]) => document.getElementById(btn).addEventListener('cl
   sendAll();
 }));
 
-[['da', 'nM/s', 'daOut'], ['mph', 'ng/mL', 'mphOut']].forEach(([id, unit, out]) => {
+[['da', 'units', 'daOut', 2], ['mph', 'ng/mL', 'mphOut', 1]].forEach(([id, unit, out, dec]) => {
   const el = document.getElementById(id), o = document.getElementById(out);
-  const upd = () => { params[id] = +el.value; o.innerHTML = `${el.value}<small>${unit}</small>`; readouts(); sendAll(); };
+  const upd = () => { params[id] = +el.value; o.innerHTML = `${(+el.value).toFixed(dec)}<small>${unit}</small>`; readouts(); sendAll(); };
   el.addEventListener('input', upd); upd();
 });
+// Profile tabs (Typical / ADHD / Anxiety, from the paper-based model)
+const profileBox = document.getElementById('profile');
+Object.entries(K.PROFILES).forEach(([key, p]) => {
+  const b = document.createElement('button'); b.textContent = p.name; b.dataset.key = key;
+  b.setAttribute('aria-pressed', key === params.profile);
+  b.addEventListener('click', () => {
+    params.profile = key;
+    profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.key === key));
+    readouts(); sendAll();
+  });
+  profileBox.appendChild(b);
+});
+
 if (document.fonts) document.fonts.ready.then(sendAll);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(sendAll, 50));
 </script>
