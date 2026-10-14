@@ -30,14 +30,14 @@ Brain dopamine has long been implicated in cognitive control processes, includin
 There are five different types of dopamine receptors, we primarily focus on D1. The reason for this is that strong evidence supports the inverted-U relationship with D1 receptors. D2 receptor activation also influences working-memory-related neural activity, but the relationship is less well established. 
 
 D1 receptors are involved in memory, attention, impulse control, regulation of renal function, and locomotion, they are primarily located in the striatum and the cerebral cortex. When you activate D1 receptors generally the firing rate of prefrontal neurons gets reduced. 
-1) Excessive stimulation: Suppression becomes too strong. The activity representing the preferred location decreases, so the neuron loses useful information and spatial tuning deteriorates. 
-2) Moderate stimulation: Activity for non-preffered locations is reduced more than activity for the preferred location. The relevant information stands out more clearly, potentially improving working memory. 
-3) Too little stimulation: Neuronal activity can be noisy, so the preferred location is not represented clearly. 
+1. Excessive stimulation: Suppression becomes too strong. The activity representing the preferred location decreases, so the neuron loses useful information and spatial tuning deteriorates. 
+2. Moderate stimulation: Activity for non-preffered locations is reduced more than activity for the preferred location. The relevant information stands out more clearly, potentially improving working memory. 
+3. Too little stimulation: Neuronal activity can be noisy, so the preferred location is not represented clearly. 
 
 Psychopharmacological studies with human volunteers indicate that the effect of dopaminergic drug administration depends on baseline level of performance. It improved cognition in subjects with lower baseline working memory, and worsening cognition in those with higher baseline working memory capacity. 
-1) Low baseline (Our ADHD stand-in): There is too little stimulation of the D1 receptors. The dose moves the individual towards the peak, so performance increases. 
-2) Near peak baseline: There is moderate stimulation and the working memory performance is already in the optimal zone. A dose gives little benefit. 
-3) High baseline: A dose pushes the individual past the peak. Resulting in excessive stimulation of the D1 receptor, and thus worsening working memory performance.
+1. Low baseline (Our ADHD stand-in): There is too little stimulation of the D1 receptors. The dose moves the individual towards the peak, so performance increases. 
+2. Near peak baseline: There is moderate stimulation and the working memory performance is already in the optimal zone. A dose gives little benefit. 
+3. High baseline: A dose pushes the individual past the peak. Resulting in excessive stimulation of the D1 receptor, and thus worsening working memory performance.
 
 `
     },
