@@ -12,9 +12,9 @@ const PKPD = (() => {
   // start = baseline dopamine the profile sets on the slider (= 2.0 + the profile's shift in the original model 2:
   // ADHD -1.0, Anxiety +0.2 stress +0.6 surge). wm = curve width factor (tolerance).
   const PROFILES = {
-    typical: { name: 'Typical',           start: 2.0, wm: 1.0 },
-    adhd:    { name: 'ADHD',              start: 1.0, wm: 1.0 },
-    anxiety: { name: 'Anxiety or stress', start: 2.8, wm: 0.875 }
+    typical: { name: 'Typical',           start: 2.0, wm: 1.0, mph: 0},
+    adhd:    { name: 'ADHD',              start: 1.0, wm: 1.0, mph: 3},
+    anxiety: { name: 'Anxiety or stress', start: 2.8, wm: 0.875, mph: 0}
   };
   const clamp = (v, a, c) => Math.min(c, Math.max(a, v));
   const performance = (da, w) => 100 * Math.exp(-Math.pow(da - PAPER.OPTIMUM, 2) / (2 * w * w));
