@@ -6,28 +6,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dopamine, working memory and MPH</title>
 <style>
-  :root { --bg:#1a1a19; --fg:#ecebe5; --muted:#b4b2a9; --grid:#3a3a37; --card:#262624; --tab:#33332f; }
+  :root { 
+    --bg: #1a1a19; --fg: #ecebe5; --muted: #b4b2a9; --grid: #3a3a37; --card: #262624; --tab: #33332f;
+    --panel: #1a1a19; --ink: #ecebe5; --mute: #b4b2a9; --line: #3a3a37; --da: #eb6834; --mph: #1baf7a; --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin:0; padding:12px; background:var(--bg); color:var(--fg); height:100vh; min-height:380px;
-         display:flex; flex-direction:column; gap:8px;
-         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .top { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-  #tabs { display:flex; flex-wrap:wrap; gap:6px; }
-  button { padding:5px 11px; border:1px solid var(--grid); border-radius:6px; background:var(--tab);
-           color:var(--fg); font-size:12px; cursor:pointer; }
-  #tabs button.active { color:#fff; font-weight:600; border-color:transparent; }
-  #reset { margin-left:auto; }
-  .plots { flex:1 1 auto; min-height:140px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .plots > div { position:relative; min-height:0; min-width:0; }
-  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
-  .card { background:var(--card); border-radius:8px; padding:6px 10px; }
-  #metrics { font-size:12px; font-weight:600; margin-bottom:2px; }
-  #desc { font-size:11.5px; color:var(--muted); line-height:1.4; }
-  .sliders { display:grid; grid-template-columns:repeat(3,1fr); gap:4px 14px; }
-  .sliders label { display:flex; justify-content:space-between; font-size:11.5px; }
-  .sliders input[type=range] { width:100%; margin:2px 0 0; height:14px; }
-  @media (max-width: 520px) { .plots { grid-template-columns:1fr; grid-auto-rows:1fr; } }
+  body { margin: 0; padding: 12px; background: var(--bg); color: var(--fg); height: 100vh; min-height: 380px;
+         display: flex; flex-direction: column; gap: 8px;
+         font-family: var(--sans); }
+  .top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { padding: 5px 11px; border: 1px solid var(--grid); border-radius: 6px; background: var(--tab);
+           color: var(--fg); font-size: 12px; cursor: pointer; }
+  #tabs button.active { color: #fff; font-weight: 600; border-color: transparent; }
+  #reset { margin-left: auto; }
+  .plots { flex: 1 1 auto; min-height: 140px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .plots > div { position: relative; min-height: 0; min-width: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .card { background: var(--card); border-radius: 8px; padding: 6px 10px; }
+  #metrics { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  #desc { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+  .sliders { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 14px; }
+  .sliders label { display: flex; justify-content: space-between; font-size: 11.5px; }
+  .sliders input[type=range] { width: 100%; margin: 2px 0 0; height: 14px; }
+  @media (max-width: 520px) { .plots { grid-template-columns: 1fr; grid-auto-rows: 1fr; } }
 </style>
 </head>
 <body>
@@ -70,6 +73,10 @@ const PROFILES = {
 };
 let current = "adhd";
 
+// Bridge styling integration
+const K = (typeof PKPD !== "undefined") ? PKPD : null;
+const col = {};
+
 function calculateDopamineShift(conc, baseDa, eMax, ec50, maxInc) {
   const occupancy = (eMax * conc) / (ec50 + conc);
   return baseDa + maxInc * occupancy;
@@ -94,7 +101,6 @@ function compute(baseline, boost, p, conc) {
 const $ = id => document.getElementById(id);
 const css = () => getComputedStyle(document.documentElement);
 
-const K = (typeof PKPD !== "undefined") ? PKPD : null;
 function plot(cv, o) {
   if (K && typeof K.plot === "function") {
     try {
@@ -107,8 +113,10 @@ function plot(cv, o) {
 }
 
 function plotOwn(cv, o) {
-  const st = css(), fg = st.getPropertyValue("--fg").trim(),
-        muted = st.getPropertyValue("--muted").trim(), grid = st.getPropertyValue("--grid").trim();
+  const st = css(), 
+        fg = col['--ink'] || st.getPropertyValue("--fg").trim(),
+        muted = col['--mute'] || st.getPropertyValue("--muted").trim(), 
+        grid = col['--line'] || st.getPropertyValue("--grid").trim();
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
   if (!W || !H) return;
   cv.width = W * dpr; cv.height = H * dpr;
@@ -118,7 +126,8 @@ function plotOwn(cv, o) {
   const L = 40, R = 10, T = 24, B = 34, pw = W - L - R, ph = H - T - B, YMAX = 105;
   const X = x => L + (x / o.xmax) * pw, Y = y => T + ph - (y / YMAX) * ph;
 
-  g.font = "10px system-ui, sans-serif"; g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
+  g.font = "10px " + (col['--sans'] || "system-ui, sans-serif"); 
+  g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
   g.textAlign = "right"; g.textBaseline = "middle";
   for (let y = 0; y <= 100; y += 20) {
     g.beginPath(); g.moveTo(L, Y(y)); g.lineTo(L + pw, Y(y)); g.stroke();
@@ -130,11 +139,11 @@ function plotOwn(cv, o) {
   g.strokeStyle = muted;
   g.strokeRect(L, T, pw, ph);
 
-  g.fillStyle = fg; g.font = "10.5px system-ui, sans-serif";
+  g.fillStyle = fg; g.font = "10.5px " + (col['--sans'] || "system-ui, sans-serif");
   g.textAlign = "center"; g.textBaseline = "alphabetic";
   g.fillText(o.xlabel, L + pw / 2, H - 5);
   g.save(); g.translate(10, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
-  g.font = "600 12px system-ui, sans-serif"; g.fillText(o.title, L + pw / 2, 15);
+  g.font = "600 12px " + (col['--sans'] || "system-ui, sans-serif"); g.fillText(o.title, L + pw / 2, 15);
 
   g.beginPath();
   o.curve.forEach((pt, i) => i ? g.lineTo(X(pt.x), Y(pt.y)) : g.moveTo(X(pt.x), Y(pt.y)));
@@ -156,7 +165,7 @@ function plotOwn(cv, o) {
     g.fill();
   });
   if (o.legend && pw > 230) {
-    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "10px system-ui, sans-serif";
+    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "10px " + (col['--sans'] || "system-ui, sans-serif");
     o.legend.forEach((l, i) => {
       const lx = L + 12, ly = T + 12 + i * 15;
       g.fillStyle = l.color; g.beginPath();
@@ -182,10 +191,10 @@ function update() {
     title: "Inverted U",
     hline: s.p0, marker: { x: s.after, y: s.p1 },
     dashed: [{ x: s.start, y: s.p0 }, { x: s.after, y: s.p1 }],
-    markers: [{ x: s.start, y: s.p0, color: "#eb6834", shape: "circle" },
-              { x: s.after, y: s.p1, color: "#1baf7a", shape: "triangle" }],
-    legend: [{ label: "Starting level", color: "#eb6834", shape: "circle" },
-             { label: "After MPH and boost", color: "#1baf7a", shape: "triangle" }]
+    markers: [{ x: s.start, y: s.p0, color: col['--da'] || "#eb6834", shape: "circle" },
+              { x: s.after, y: s.p1, color: col['--mph'] || "#1baf7a", shape: "triangle" }],
+    legend: [{ label: "Starting level", color: col['--da'] || "#eb6834", shape: "circle" },
+             { label: "After MPH and boost", color: col['--mph'] || "#1baf7a", shape: "triangle" }]
   });
 
   const curve2 = [];
@@ -195,7 +204,7 @@ function update() {
     xlabel: "MPH concentration (ng/mL)", ylabel: "Performance (%)",
     title: "Dose-response: " + p.name,
     hline: s.p0, marker: { x: conc, y: s.p1 },
-    markers: [{ x: conc, y: s.p1, color: "#1baf7a", shape: "triangle" }]
+    markers: [{ x: conc, y: s.p1, color: col['--mph'] || "#1baf7a", shape: "triangle" }]
   });
 
   const change = s.p1 - s.p0;
@@ -222,7 +231,16 @@ Object.entries(PROFILES).forEach(([key, p]) => {
 $("reset").addEventListener("click", () => {
   Object.keys(DEFAULTS).forEach(k => $(k).value = DEFAULTS[k]); update();
 });
-if (K && typeof K.onUpdate === "function") K.onUpdate(() => update());
+
+if (K && typeof K.onUpdate === "function") {
+  K.onUpdate(p => {
+    ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => {
+      if (typeof K.css === "function") col[n] = K.css(n);
+    });
+    update();
+  });
+}
+
 if (typeof ResizeObserver !== "undefined") new ResizeObserver(update).observe($("plots"));
 else window.addEventListener("resize", update);
 update();
