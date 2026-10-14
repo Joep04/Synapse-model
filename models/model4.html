@@ -1,100 +1,249 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
-<body><canvas id="c"></canvas>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../bridge.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dopamine, working memory and MPH</title>
+<style>
+  :root { 
+    --bg: #1a1a19; --fg: #ecebe5; --muted: #b4b2a9; --grid: #3a3a37; --card: #262624; --tab: #33332f;
+    --panel: #1a1a19; --ink: #ecebe5; --mute: #b4b2a9; --line: #3a3a37; --da: #eb6834; --mph: #1baf7a; --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; padding: 12px; background: var(--bg); color: var(--fg); height: 100vh; min-height: 380px;
+         display: flex; flex-direction: column; gap: 8px;
+         font-family: var(--sans); }
+  .top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { padding: 5px 11px; border: 1px solid var(--grid); border-radius: 6px; background: var(--tab);
+           color: var(--fg); font-size: 12px; cursor: pointer; }
+  #tabs button.active { color: #fff; font-weight: 600; border-color: transparent; }
+  #reset { margin-left: auto; }
+  .plots { flex: 1 1 auto; min-height: 140px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .plots > div { position: relative; min-height: 0; min-width: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .card { background: var(--card); border-radius: 8px; padding: 6px 10px; }
+  #metrics { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  #desc { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+  .sliders { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 14px; }
+  .sliders label { display: flex; justify-content: space-between; font-size: 11.5px; }
+  .sliders input[type=range] { width: 100%; margin: 2px 0 0; height: 14px; }
+  @media (max-width: 520px) { .plots { grid-template-columns: 1fr; grid-auto-rows: 1fr; } }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div id="tabs"></div>
+    <button id="reset">Reset</button>
+  </div>
+
+  <div class="plots" id="plots">
+    <div><canvas id="c1" role="img" aria-label="Inverted U curve of working memory performance against dopamine level"></canvas></div>
+    <div><canvas id="c2" role="img" aria-label="Dose-response curve of performance against MPH concentration"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div id="metrics"></div>
+    <div id="desc"></div>
+  </div>
+
+  <div class="sliders">
+    <div><label for="baseline"><span>Baseline dopamine</span><span id="baseline-v"></span></label>
+      <input type="range" id="baseline" min="0" max="4" step="0.01" value="2"></div>
+    <div><label for="boost"><span>Extra boost</span><span id="boost-v"></span></label>
+      <input type="range" id="boost" min="-1.2" max="1.2" step="0.05" value="0"></div>
+    <div><label for="mph"><span>MPH (ng/mL)</span><span id="mph-v"></span></label>
+      <input type="range" id="mph" min="0" max="40" step="0.5" value="5"></div>
+  </div>
+
 <script>
-const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
-// Performance (0-1) comes from model 2 via PKPD.share({ perfUnmedicated, perfMedicated }), same as model 3.
-const FALLBACK = { base: 0.45, med: 0.75 };
-// Keep these four equal to model3.html so the ring fades in step with the valley:
-const DMAX = 0.6, TAU = 4, SLOPE = 1.2, LEN = 1.0;
-const ACRIT = SLOPE / (2 * Math.PI / LEN) ** 2;   // valley depth at which the memory is lost in model 3
+const DA_MAX = 4.0, OPTIMUM = 2.0, CURVE_WIDTH = 0.64;
+const MPH = { ec50: 4.5, eMax: 1.0, maxInc: 2.5 };
+const DEFAULTS = { baseline: 2.0, boost: 0.0, mph: 5.0 };
 
-const N = 48,        // excitatory neurons on the ring
-      I0 = 0.3,      // background input
-      INH = 0.5,     // global inhibition
-      TAUN = 0.05,   // neuron time constant (s)
-      SIG = 0.15,    // input noise (makes the bump drift)
-      JC = 1.12,     // recurrent excitation at which the bump can no longer be held
-      JGAIN = 0.063, // recurrent excitation per unit of valley depth above critical
-      LOST = 0.1,    // bump strength below which the memory counts as lost
-      PAUSE = 2, TMAX = 30;
+const PROFILES = {
+  typical: { name: "Typical", color: "#898781", dl: 0.0, db: 0.0, wm: 1.0,
+    text: "No profile effect: only the sliders count. Without medication this person sits at the optimum, so extra stimulation is more likely to hurt than help." },
+  adhd: { name: "ADHD", color: "#2a78d6", dl: -1.0, db: 0.0, wm: 1.0,
+    text: "Lower prefrontal catecholamine signaling: the starting level shifts down onto the left slope of the curve. Raise the MPH concentration to see medication move the person toward the optimum and then past it." },
+  anxiety: { name: "Anxiety or stress", color: "#c94f8a", dl: 0.2, db: 0.6, wm: 0.875,
+    text: "Anxiety adds a stress surge of catecholamines and reduces tolerance. The person already sits close to or past the optimum, so extra stimulation quickly turns negative. Norepinephrine matters at least as much as dopamine here, so this is a simplification." }
+};
+let current = "adhd";
 
-const TH = Array.from({ length: N }, (_, i) => 2 * Math.PI * i / N), COS = TH.map(Math.cos), SIN = TH.map(Math.sin);
-let P = K.params, W = 0, H = 0, last = performance.now(), perf = { ...FALLBACK }, sim = null;
+// Bridge styling integration
+const K = (typeof PKPD !== "undefined") ? PKPD : null;
 const col = {};
-const randn = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
-const clamp = v => Math.min(1, Math.max(0, +v));
 
-function newTrial() {
-  sim = { t: 0, wait: 0, th0: Math.random() * 2 * Math.PI,
-    rings: [perf.base, perf.med].map(p => ({ p, r: Float64Array.from({ length: N }, () => I0 / (1 + INH) * (1 + 0.1 * Math.random())), sm: 0, psi: 0, lost: null })) };
+function calculateDopamineShift(conc, baseDa, eMax, ec50, maxInc) {
+  const occupancy = (eMax * conc) / (ec50 + conc);
+  return baseDa + maxInc * occupancy;
 }
-K.onUpdate(p => {
-  P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n));
-  const s = p.shared || {};
-  const nb = clamp(s.perfUnmedicated ?? FALLBACK.base), nm = clamp(s.perfMedicated ?? FALLBACK.med);
-  if (!sim || nb !== perf.base || nm !== perf.med) { perf = { base: nb, med: nm }; newTrial(); }
-});
-c.addEventListener('click', () => newTrial());
-
-function fit() {
-  const d = devicePixelRatio || 1; W = c.clientWidth; H = c.clientHeight;
-  if (c.width !== Math.round(W * d) || c.height !== Math.round(H * d)) { c.width = W * d; c.height = H * d; }
-  g.setTransform(d, 0, 0, d, 0, 0);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const performance = (da, w) => 100 * Math.exp(-Math.pow(da - OPTIMUM, 2) / (2 * w * w));
+function zone(da, w) {
+  const d = da - OPTIMUM;
+  if (Math.abs(d) <= 0.5 * w) return "Near optimum";
+  return d < 0 ? "Under-stimulated" : "Over-stimulated";
+}
+function compute(baseline, boost, p, conc) {
+  const start = clamp(baseline + p.dl, 0, DA_MAX);
+  const daMph = calculateDopamineShift(conc, start, MPH.eMax, MPH.ec50, MPH.maxInc);
+  const after = clamp(daMph + boost + p.db, 0, DA_MAX);
+  const width = CURVE_WIDTH * p.wm;
+  return { start, after, width,
+           occupancy: (MPH.eMax * conc) / (MPH.ec50 + conc),
+           p0: performance(start, width), p1: performance(after, width) };
 }
 
-function step(dt) {
-  if (sim.rings.every(R => R.lost !== null) || sim.t > TMAX) { sim.wait += dt; if (sim.wait > PAUSE) { newTrial(); return; } }
-  const n = Math.ceil(dt / 0.005), h = dt / n;
-  for (let k = 0; k < n; k++) {
-    sim.t += h;
-    sim.rings.forEach(R => {
-      const depth = DMAX * R.p * Math.exp(-sim.t / TAU), J = JC + JGAIN * (depth / ACRIT - 1);   // recurrent excitation decays like the valley
-      let cc = 0, ss = 0, m = 0;
-      for (let j = 0; j < N; j++) { cc += R.r[j] * COS[j]; ss += R.r[j] * SIN[j]; m += R.r[j]; }
-      cc *= 2 / N; ss *= 2 / N; m /= N;
-      for (let i = 0; i < N; i++) {
-        let hh = I0 + J * (cc * COS[i] + ss * SIN[i]) - INH * m + SIG * randn();
-        if (sim.t < 0.5) hh += Math.exp(2 * (Math.cos(TH[i] - sim.th0) - 1));      // cue: the memory to store
-        R.r[i] += h / TAUN * (-R.r[i] + Math.min(1, Math.max(0, hh)));
-      }
-      const m1 = Math.hypot(cc, ss); R.sm += h / 0.3 * (m1 - R.sm); R.psi = Math.atan2(ss, cc);
-      if (R.lost === null && sim.t > 0.8 && R.sm < LOST) R.lost = sim.t;
+const $ = id => document.getElementById(id);
+const css = () => getComputedStyle(document.documentElement);
+
+function plot(cv, o) {
+  if (K && typeof K.plot === "function") {
+    try {
+      K.plot(cv, { x: o.curve.map(pt => pt.x), y: o.curve.map(pt => pt.y), xmax: o.xmax, ymax: 100,
+                   xlabel: o.xlabel, ylabel: o.ylabel, hline: o.hline, marker: o.marker });
+      return;
+    } catch (e) { console.warn("bridge.js plot failed, using built-in plot:", e); }
+  }
+  plotOwn(cv, o);
+}
+
+function plotOwn(cv, o) {
+  const st = css(), 
+        fg = col['--ink'] || st.getPropertyValue("--fg").trim(),
+        muted = col['--mute'] || st.getPropertyValue("--muted").trim(), 
+        grid = col['--line'] || st.getPropertyValue("--grid").trim();
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const L = 40, R = 10, T = 24, B = 34, pw = W - L - R, ph = H - T - B, YMAX = 105;
+  const X = x => L + (x / o.xmax) * pw, Y = y => T + ph - (y / YMAX) * ph;
+
+  g.font = "10px " + (col['--sans'] || "system-ui, sans-serif"); 
+  g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let y = 0; y <= 100; y += 20) {
+    g.beginPath(); g.moveTo(L, Y(y)); g.lineTo(L + pw, Y(y)); g.stroke();
+    g.fillText(String(y), L - 5, Y(y));
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (let x = 0; x <= o.xmax + 1e-9; x += o.xstep) g.fillText(String(+x.toFixed(2)), X(x), T + ph + 4);
+
+  g.strokeStyle = muted;
+  g.strokeRect(L, T, pw, ph);
+
+  g.fillStyle = fg; g.font = "10.5px " + (col['--sans'] || "system-ui, sans-serif");
+  g.textAlign = "center"; g.textBaseline = "alphabetic";
+  g.fillText(o.xlabel, L + pw / 2, H - 5);
+  g.save(); g.translate(10, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
+  g.font = "600 12px " + (col['--sans'] || "system-ui, sans-serif"); g.fillText(o.title, L + pw / 2, 15);
+
+  g.beginPath();
+  o.curve.forEach((pt, i) => i ? g.lineTo(X(pt.x), Y(pt.y)) : g.moveTo(X(pt.x), Y(pt.y)));
+  g.strokeStyle = o.color; g.lineWidth = 2.5; g.stroke();
+
+  if (o.vline !== undefined) {
+    g.setLineDash([2, 3]); g.strokeStyle = muted; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(X(o.vline), T); g.lineTo(X(o.vline), T + ph); g.stroke(); g.setLineDash([]);
+  }
+  if (o.dashed) {
+    g.setLineDash([5, 3]); g.strokeStyle = muted; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(X(o.dashed[0].x), Y(o.dashed[0].y)); g.lineTo(X(o.dashed[1].x), Y(o.dashed[1].y));
+    g.stroke(); g.setLineDash([]);
+  }
+  o.markers.forEach(m => {
+    g.fillStyle = m.color; g.beginPath();
+    if (m.shape === "circle") g.arc(X(m.x), Y(m.y), 5.5, 0, 2 * Math.PI);
+    else { const cx = X(m.x), cy = Y(m.y); g.moveTo(cx, cy - 7); g.lineTo(cx + 6.5, cy + 5); g.lineTo(cx - 6.5, cy + 5); g.closePath(); }
+    g.fill();
+  });
+  if (o.legend && pw > 230) {
+    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "10px " + (col['--sans'] || "system-ui, sans-serif");
+    o.legend.forEach((l, i) => {
+      const lx = L + 12, ly = T + 12 + i * 15;
+      g.fillStyle = l.color; g.beginPath();
+      if (l.shape === "circle") g.arc(lx, ly, 4.5, 0, 2 * Math.PI);
+      else { g.moveTo(lx, ly - 5); g.lineTo(lx + 5, ly + 4); g.lineTo(lx - 5, ly + 4); g.closePath(); }
+      g.fill(); g.fillStyle = fg; g.fillText(l.label, lx + 10, ly);
     });
   }
 }
 
-function draw() {
-  g.clearRect(0, 0, W, H);
-  const rad = Math.max(20, Math.min(W / 4 - 22, H / 2 - 36)), cy = H / 2 + 12;
-  const pos = (cx, a, rr) => [cx + rr * Math.sin(a), cy - rr * Math.cos(a)];
-  [['Unmedicated', col['--mute']], ['Medicated', col['--mph']]].forEach(([name, color], k) => {
-    const R = sim.rings[k], cx = W * (0.25 + 0.5 * k);
-    g.strokeStyle = col['--line']; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, rad, 0, 7); g.stroke();
-    g.fillStyle = color;
-    for (let i = 0; i < N; i++) {                       // neurons: size and opacity = firing rate
-      const [x, y] = pos(cx, TH[i], rad), f = R.r[i];
-      g.globalAlpha = 0.15 + 0.85 * f; g.beginPath(); g.arc(x, y, rad * (0.03 + 0.055 * f), 0, 7); g.fill();
-    }
-    g.globalAlpha = 1;
-    const [tx, ty] = pos(cx, sim.th0, rad * 1.2);        // the cued (to-be-remembered) angle
-    g.strokeStyle = col['--ink']; g.lineWidth = 2; g.beginPath(); g.moveTo(...pos(cx, sim.th0, rad * 1.1)); g.lineTo(tx, ty); g.stroke();
-    if (R.sm > 0.06) {                                   // arrow = remembered angle, length = bump strength
-      const [ax, ay] = pos(cx, R.psi, rad * 0.8 * Math.min(1, R.sm / 0.5));
-      g.strokeStyle = color; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(ax, ay); g.stroke();
-      g.beginPath(); g.arc(ax, ay, 4, 0, 7); g.fill();
-    }
-    g.font = '11px ' + col['--sans']; g.textAlign = 'center'; g.fillStyle = color; g.beginPath(); g.arc(cx - 40, 14, 4.5, 0, 7); g.fill();
-    g.fillStyle = col['--mute']; g.textAlign = 'left'; g.fillText(name, cx - 32, 18);
-    g.textAlign = 'center'; g.fillText(R.lost === null ? 'holding' : 'memory lost at ' + R.lost.toFixed(1) + ' s', cx, 34);
+function update() {
+  const baseline = +$("baseline").value, boost = +$("boost").value, conc = +$("mph").value;
+  const p = PROFILES[current], s = compute(baseline, boost, p, conc);
+  $("baseline-v").textContent = baseline.toFixed(2);
+  $("boost-v").textContent = (boost >= 0 ? "+" : "") + boost.toFixed(2);
+  $("mph-v").textContent = conc.toFixed(1);
+
+  const curve1 = [];
+  for (let i = 0; i <= 300; i++) { const x = i * DA_MAX / 300; curve1.push({ x, y: performance(x, s.width) }); }
+  plot($("c1"), {
+    xmax: DA_MAX, xstep: 0.5, color: p.color, curve: curve1,
+    xlabel: "Dopamine (relative units)", ylabel: "Performance (%)",
+    title: "Inverted U",
+    hline: s.p0, marker: { x: s.after, y: s.p1 },
+    dashed: [{ x: s.start, y: s.p0 }, { x: s.after, y: s.p1 }],
+    markers: [{ x: s.start, y: s.p0, color: col['--da'] || "#eb6834", shape: "circle" },
+              { x: s.after, y: s.p1, color: col['--mph'] || "#1baf7a", shape: "triangle" }],
+    legend: [{ label: "Starting level", color: col['--da'] || "#eb6834", shape: "circle" },
+             { label: "After MPH and boost", color: col['--mph'] || "#1baf7a", shape: "triangle" }]
   });
-  g.fillStyle = col['--mute']; g.textAlign = 'right'; g.fillText(Math.min(sim.t, TMAX).toFixed(1) + ' s', W - 10, 18);
+
+  const curve2 = [];
+  for (let i = 0; i <= 160; i++) { const c = i * 0.25; curve2.push({ x: c, y: compute(baseline, boost, p, c).p1 }); }
+  plot($("c2"), {
+    xmax: 40, xstep: 10, color: p.color, curve: curve2, vline: conc,
+    xlabel: "MPH concentration (ng/mL)", ylabel: "Performance (%)",
+    title: "Dose-response: " + p.name,
+    hline: s.p0, marker: { x: conc, y: s.p1 },
+    markers: [{ x: conc, y: s.p1, color: col['--mph'] || "#1baf7a", shape: "triangle" }]
+  });
+
+  const change = s.p1 - s.p0;
+  $("metrics").textContent = p.name + ":  performance " + Math.round(s.p0) + "% \u2192 " + Math.round(s.p1) + "% (" +
+    (change >= 0 ? "+" : "") + Math.round(change) + " points)  |  DAT occupancy " + Math.round(s.occupancy * 100) +
+    "%  |  " + zone(s.after, s.width);
+  $("desc").textContent = p.text;
+
+  document.querySelectorAll("#tabs button").forEach(b => {
+    const on = b.dataset.key === current;
+    b.classList.toggle("active", on);
+    b.style.background = on ? PROFILES[b.dataset.key].color : "";
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
 }
 
-function loop(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now; fit();
-  if (W && sim && col['--da']) { step(dt); draw(); }
-  requestAnimationFrame(loop);
+Object.entries(PROFILES).forEach(([key, p]) => {
+  const b = document.createElement("button");
+  b.textContent = p.name; b.dataset.key = key;
+  b.addEventListener("click", () => { current = key; update(); });
+  $("tabs").appendChild(b);
+});
+["baseline", "boost", "mph"].forEach(id => $(id).addEventListener("input", update));
+$("reset").addEventListener("click", () => {
+  Object.keys(DEFAULTS).forEach(k => $(k).value = DEFAULTS[k]); update();
+});
+
+if (K && typeof K.onUpdate === "function") {
+  K.onUpdate(p => {
+    ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => {
+      if (typeof K.css === "function") col[n] = K.css(n);
+    });
+    update();
+  });
 }
-requestAnimationFrame(loop);
-</script></body></html>
+
+if (typeof ResizeObserver !== "undefined") new ResizeObserver(update).observe($("plots"));
+else window.addEventListener("resize", update);
+update();
+</script>
+</body>
+</html>
