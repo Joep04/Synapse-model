@@ -129,11 +129,12 @@ addEventListener('message', e => {
   if (JSON.stringify(shared) !== before) sendAll();
 });
 
-function readouts() {
+function readouts() {   // sidebar readout is optional: does nothing if the elements were removed
   const r = K.compute(params.da, params.mph, params.profile);
-  document.getElementById('perfOut').innerHTML = `${Math.round(r.p1)}<small>%</small>`;
-  document.getElementById('perf0Out').textContent = `${Math.round(r.p0)}%`;
-  document.getElementById('occOut').textContent = `${Math.round(r.occupancy * 100)}%`;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
+  set('perfOut', `${Math.round(r.p1)}<small>%</small>`);
+  set('perf0Out', `${Math.round(r.p0)}%`);
+  set('occOut', `${Math.round(r.occupancy * 100)}%`);
 }
 const paragraphs = t => t.trim().split(/\n\s*\n/).map(p => `<p>${p.trim()}</p>`).join('');
 
