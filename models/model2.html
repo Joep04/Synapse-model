@@ -37,10 +37,26 @@ function draw(cv, o) {
   g.beginPath(); g.moveTo(X(o.x[0]), Y(0));
   o.x.forEach((x, i) => g.lineTo(X(x), Y(o.y[i]))); g.lineTo(X(o.x[o.x.length - 1]), Y(0)); g.closePath();
   g.globalAlpha = .09; g.fillStyle = C('--da'); g.fill(); g.globalAlpha = 1;
+  
+  // Set dash pattern [5, 4] and default grey stroke style
   g.setLineDash([5, 4]); g.strokeStyle = C('--mute'); g.lineWidth = 1.2;
-  if (o.hline != null) { g.beginPath(); g.moveTo(m.l, Y(o.hline)); g.lineTo(W - m.r, Y(o.hline)); g.stroke(); }
+  
+  // Unmedicated horizontal line (grey dashed)
+  if (o.hline != null) { 
+    g.beginPath(); g.moveTo(m.l, Y(o.hline)); g.lineTo(W - m.r, Y(o.hline)); g.stroke(); 
+  }
+  
+  // Medicated horizontal line (purple dashed)
+  if (o.hline2 != null) {
+    g.save();
+    if (o.hline2Color) g.strokeStyle = o.hline2Color;
+    g.beginPath(); g.moveTo(m.l, Y(o.hline2)); g.lineTo(W - m.r, Y(o.hline2)); g.stroke();
+    g.restore();
+  }
+  
   if (o.vline != null) { g.beginPath(); g.moveTo(X(o.vline), m.t); g.lineTo(X(o.vline), m.t + ph); g.stroke(); }
   if (o.link) { g.beginPath(); g.moveTo(X(o.link[0].x), Y(o.link[0].y)); g.lineTo(X(o.link[1].x), Y(o.link[1].y)); g.stroke(); }
+  
   g.setLineDash([]);
   g.strokeStyle = C('--curve'); g.lineWidth = 2.5; g.lineJoin = 'round'; g.beginPath();
   o.x.forEach((x, i) => i ? g.lineTo(X(x), Y(o.y[i])) : g.moveTo(X(x), Y(o.y[i]))); g.stroke();
