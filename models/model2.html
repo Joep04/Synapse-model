@@ -58,7 +58,7 @@ function draw(cv, o) {
 }
 
 function update() {
-  const baseline = P.da, conc = P.mph, s = K.compute(baseline, conc, P.profile), name = K.PROFILES[P.profile].name;
+  const baseline = P.da, conc = P.mph, s = K.compute(baseline, conc, P.profile), name = (K.PROFILES[P.profile] || { name: 'Custom' }).name;
   const grey = K.css('--mute'), violet = K.css('--mph'), xs = K.linspace(0, K.PAPER.DA_MAX, 200);
   draw(document.getElementById('c1'), {
     x: xs, y: xs.map(x => K.performance(x, s.width)), xmax: K.PAPER.DA_MAX, xstep: 1, title: 'Inverted U', xlabel: 'Dopamine (relative units)',
