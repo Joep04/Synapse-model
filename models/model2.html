@@ -6,35 +6,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dopamine, working memory and MPH</title>
 <style>
-  :root { --bg:#ffffff; --fg:#1f1f1e; --muted:#5f5e5a; --grid:#e1e0d9; --card:#f3f2ee; --tab:#e6e5df; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#1a1a19; --fg:#ecebe5; --muted:#b4b2a9; --grid:#3a3a37; --card:#262624; --tab:#33332f; }
-  }
+  :root { --bg:#1a1a19; --fg:#ecebe5; --muted:#b4b2a9; --grid:#3a3a37; --card:#262624; --tab:#33332f; }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin:0; padding:8px 10px; background:var(--bg); color:var(--fg); height:100vh; min-height:380px;
+  body { margin:0; padding:12px; background:var(--bg); color:var(--fg); height:100vh; min-height:380px;
          display:flex; flex-direction:column; gap:6px;
          font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .top { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+         
+  /* Stijl passend bij de andere panelen met titel, subtitel en infobutton */
+  .panel-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+  .panel-title { font-size: 13px; font-weight: 600; color: var(--fg); margin: 0; }
+  .panel-desc { font-size: 11px; color: var(--muted); margin: 0 0 4px 0; }
+  .info-btn { background: none; border: 1px solid var(--grid); color: var(--muted); border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; flex-shrink: 0; }
+  .info-btn:hover { color: var(--fg); border-color: var(--fg); }
+
+  .top { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom: 2px; }
   #tabs { display:flex; flex-wrap:wrap; gap:6px; }
-  button { padding:5px 11px; border:1px solid var(--grid); border-radius:6px; background:var(--tab);
-           color:var(--fg); font-size:12px; cursor:pointer; }
+  button { padding:4px 10px; border:1px solid var(--grid); border-radius:6px; background:var(--tab);
+           color:var(--fg); font-size:11.5px; cursor:pointer; }
   #tabs button.active { color:#fff; font-weight:600; border-color:transparent; }
   #reset { margin-left:auto; }
-  .plots { flex:1 1 auto; min-height:140px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  
+  .plots { flex:1 1 auto; min-height:120px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .plots > div { position:relative; min-height:0; min-width:0; }
   canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  
   .card { background:var(--card); border-radius:8px; padding:6px 10px; }
-  #metrics { font-size:12px; font-weight:600; margin-bottom:2px; }
-  #desc { font-size:11.5px; color:var(--muted); line-height:1.4; }
-  .sliders { display:grid; grid-template-columns:repeat(3,1fr); gap:4px 14px; }
-  .sliders label { display:flex; justify-content:space-between; font-size:11.5px; }
-  .sliders input[type=range] { width:100%; margin:2px 0 0; height:14px; }
-  .note { font-size:10.5px; color:var(--muted); margin:0; }
+  #metrics { font-size:11.5px; font-weight:600; margin-bottom:2px; }
+  #desc { font-size:11px; color:var(--muted); line-height:1.35; }
+  
+  .sliders { display:grid; grid-template-columns:repeat(3,1fr); gap:2px 14px; margin-top: 2px; }
+  .sliders label { display:flex; justify-content:space-between; font-size:11px; }
+  .sliders input[type=range] { width:100%; margin:1px 0 0; height:12px; }
+  
   @media (max-width: 520px) { .plots { grid-template-columns:1fr; grid-auto-rows:1fr; } }
 </style>
 </head>
 <body>
+
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title">2. DAT uptake kinetics</h2>
+      <p class="panel-desc">Dashed line = release rate; the crossing with the curve is steady state.</p>
+    </div>
+    <button class="info-btn" aria-label="Information">i</button>
+  </div>
+
   <div class="top">
     <div id="tabs"></div>
     <button id="reset">Reset</button>
@@ -58,8 +75,6 @@
     <div><label for="mph"><span>MPH (ng/mL)</span><span id="mph-v"></span></label>
       <input type="range" id="mph" min="0" max="40" step="0.5" value="5"></div>
   </div>
-
-  <p class="note">Illustrative model, not a diagnostic or medical tool. Relative dopamine 0&ndash;4; a typical person sits at 2.0 (their optimum).</p>
 
 <script>
 const DA_MAX = 4.0, OPTIMUM = 2.0, CURVE_WIDTH = 0.64;
@@ -121,54 +136,56 @@ function plotOwn(cv, o) {
   const g = cv.getContext("2d");
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
-  const L = 40, R = 10, T = 24, B = 34, pw = W - L - R, ph = H - T - B, YMAX = 105;
+  const L = 36, R = 10, T = 16, B = 30, pw = W - L - R, ph = H - T - B, YMAX = 105;
   const X = x => L + (x / o.xmax) * pw, Y = y => T + ph - (y / YMAX) * ph;
 
-  g.font = "10px system-ui, sans-serif"; g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
+  g.font = "9.5px system-ui, sans-serif"; g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
   g.textAlign = "right"; g.textBaseline = "middle";
-  for (let y = 0; y <= 100; y += 20) {
+  for (let y = 0; y <= 100; y += 25) {
     g.beginPath(); g.moveTo(L, Y(y)); g.lineTo(L + pw, Y(y)); g.stroke();
-    g.fillText(String(y), L - 5, Y(y));
+    g.fillText(String(y), L - 4, Y(y));
   }
   g.textAlign = "center"; g.textBaseline = "top";
-  for (let x = 0; x <= o.xmax + 1e-9; x += o.xstep) g.fillText(String(+x.toFixed(2)), X(x), T + ph + 4);
+  for (let x = 0; x <= o.xmax + 1e-9; x += o.xstep) g.fillText(String(+x.toFixed(2)), X(x), T + ph + 3);
 
   g.strokeStyle = muted;
   g.strokeRect(L, T, pw, ph);
 
-  g.fillStyle = fg; g.font = "10.5px system-ui, sans-serif";
+  g.fillStyle = fg; g.font = "10px system-ui, sans-serif";
   g.textAlign = "center"; g.textBaseline = "alphabetic";
-  g.fillText(o.xlabel, L + pw / 2, H - 5);
-  g.save(); g.translate(10, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
-  g.font = "600 12px system-ui, sans-serif"; g.fillText(o.title, L + pw / 2, 15);
+  g.fillText(o.xlabel, L + pw / 2, H - 4);
+  g.save(); g.translate(8, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
+  
+  // Titel van de grafiek zelf iets subtieler gehouden omdat de paneeltitel er al boven staat
+  g.font = "600 11px system-ui, sans-serif"; g.fillText(o.title, L + pw / 2, 10);
 
   g.beginPath();
   o.curve.forEach((pt, i) => i ? g.lineTo(X(pt.x), Y(pt.y)) : g.moveTo(X(pt.x), Y(pt.y)));
-  g.strokeStyle = o.color; g.lineWidth = 2.5; g.stroke();
+  g.strokeStyle = o.color; g.lineWidth = 2; g.stroke();
 
   if (o.vline !== undefined) {
     g.setLineDash([2, 3]); g.strokeStyle = muted; g.lineWidth = 1;
     g.beginPath(); g.moveTo(X(o.vline), T); g.lineTo(X(o.vline), T + ph); g.stroke(); g.setLineDash([]);
   }
   if (o.dashed) {
-    g.setLineDash([5, 3]); g.strokeStyle = muted; g.lineWidth = 1.2;
+    g.setLineDash([5, 3]); g.strokeStyle = muted; g.lineWidth = 1;
     g.beginPath(); g.moveTo(X(o.dashed[0].x), Y(o.dashed[0].y)); g.lineTo(X(o.dashed[1].x), Y(o.dashed[1].y));
     g.stroke(); g.setLineDash([]);
   }
   o.markers.forEach(m => {
     g.fillStyle = m.color; g.beginPath();
-    if (m.shape === "circle") g.arc(X(m.x), Y(m.y), 5.5, 0, 2 * Math.PI);
-    else { const cx = X(m.x), cy = Y(m.y); g.moveTo(cx, cy - 7); g.lineTo(cx + 6.5, cy + 5); g.lineTo(cx - 6.5, cy + 5); g.closePath(); }
+    if (m.shape === "circle") g.arc(X(m.x), Y(m.y), 4.5, 0, 2 * Math.PI);
+    else { const cx = X(m.x), cy = Y(m.y); g.moveTo(cx, cy - 6); g.lineTo(cx + 5.5, cy + 4); g.lineTo(cx - 5.5, cy + 4); g.closePath(); }
     g.fill();
   });
   if (o.legend && pw > 230) {
-    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "10px system-ui, sans-serif";
+    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "9.5px system-ui, sans-serif";
     o.legend.forEach((l, i) => {
-      const lx = L + 12, ly = T + 12 + i * 15;
+      const lx = L + 10, ly = T + 10 + i * 14;
       g.fillStyle = l.color; g.beginPath();
-      if (l.shape === "circle") g.arc(lx, ly, 4.5, 0, 2 * Math.PI);
-      else { g.moveTo(lx, ly - 5); g.lineTo(lx + 5, ly + 4); g.lineTo(lx - 5, ly + 4); g.closePath(); }
-      g.fill(); g.fillStyle = fg; g.fillText(l.label, lx + 10, ly);
+      if (l.shape === "circle") g.arc(lx, ly, 4, 0, 2 * Math.PI);
+      else { g.moveTo(lx, ly - 4); g.lineTo(lx + 4, ly + 3); g.lineTo(lx - 4, ly + 3); g.closePath(); }
+      g.fill(); g.fillStyle = fg; g.fillText(l.label, lx + 8, ly);
     });
   }
 }
