@@ -15,7 +15,7 @@ const PKPD = (() => {
   const PROFILES = {
     typical: { name: 'Typical',           start: 2.0, mph: 0, wm: 1.0 },
     adhd:    { name: 'ADHD',              start: 1.0, mph: 3, wm: 1.0 },
-    anxiety: { name: 'Anxiety or stress', start: 2.8, mph: 0, wm: 0.875 }
+    anxiety: { name: 'Anxiety or stress', start: 2.8, mph: 0, wm: 1.0 }
   };
   const clamp = (v, a, c) => Math.min(c, Math.max(a, v));
   const performance = (da, w) => 100 * Math.exp(-Math.pow(da - PAPER.OPTIMUM, 2) / (2 * w * w));
