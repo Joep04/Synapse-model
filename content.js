@@ -17,7 +17,7 @@ ADHD is an example of people with dopamine dysregulation. The dopamine hypothesi
 
 When neurotransmitters are released in the synapse, the process of reuptake occurs. Reuptake is the absorption of a neurotransmitter by a neurotransmitter transporter located along the plasma membrane of an axon terminal or glial cell. 
 
-The reuptake problem of dopamine in a person with ADHD entails that specific genes result in higher levels of dopamine transporter channels whiting the brian. More dopamine channels means that dopamine will be removed more effectively from the synapse, meaning it has less chance of binding with receptors. 
+The reuptake problem of dopamine in a person with ADHD entails that specific genes result in higher levels of dopamine transporter channels whitin the brian. More dopamine channels means that dopamine will be removed more effectively from the synapse, meaning it has less chance of binding with receptors. 
 `
     },
     {
