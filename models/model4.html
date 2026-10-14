@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
 <body><canvas id="c"></canvas>
 <script>
@@ -17,6 +17,7 @@ const N = 48,        // excitatory neurons on the ring
       JC = 1.12,     // recurrent excitation at which the bump can no longer be held
       JGAIN = 0.063, // recurrent excitation per unit of valley depth above critical
       LOST = 0.1,    // bump strength below which the memory counts as lost
+      HOLD = 0.13,   // while model 3 still holds the memory, keep the bump from dying on its own
       PAUSE = 2, TMAX = 30;
 
 const TH = Array.from({ length: N }, (_, i) => 2 * Math.PI * i / N), COS = TH.map(Math.cos), SIN = TH.map(Math.sin);
@@ -25,17 +26,22 @@ const col = {};
 const randn = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
 const clamp = v => Math.min(1, Math.max(0, +v));
 
-function newTrial() {
-  sim = { t: 0, wait: 0, th0: Math.random() * 2 * Math.PI,
+// Synced with model 3: it shares its trial id and the moments the ball is lost (s.trial, s.lostUnmedicated, s.lostMedicated).
+// Until model 3 has sent a trial, this model runs its own trial.
+function newTrial(trial) {
+  sim = { trial, synced: trial !== undefined, t: 0, wait: 0, th0: Math.random() * 2 * Math.PI,
     rings: [perf.base, perf.med].map(p => ({ p, r: Float64Array.from({ length: N }, () => I0 / (1 + INH) * (1 + 0.1 * Math.random())), sm: 0, psi: 0, lost: null })) };
 }
 K.onUpdate(p => {
   P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n));
   const s = p.shared || {};
   const nb = clamp(s.perfUnmedicated ?? FALLBACK.base), nm = clamp(s.perfMedicated ?? FALLBACK.med);
-  if (!sim || nb !== perf.base || nm !== perf.med) { perf = { base: nb, med: nm }; newTrial(); }
+  if (s.trial !== undefined) {
+    if (!sim || sim.trial !== s.trial) { perf = { base: nb, med: nm }; newTrial(s.trial); }
+    sim.rings.forEach((R, k) => { const l = [s.lostUnmedicated, s.lostMedicated][k] ?? null; if (l !== null && R.lost === null) R.lost = l; });
+  } else if (!sim || nb !== perf.base || nm !== perf.med) { perf = { base: nb, med: nm }; newTrial(); }
 });
-c.addEventListener('click', () => newTrial());
+c.addEventListener('click', () => { if (!sim.synced) newTrial(); });   // when synced, click the valley model to restart
 
 function fit() {
   const d = devicePixelRatio || 1; W = c.clientWidth; H = c.clientHeight;
@@ -44,12 +50,14 @@ function fit() {
 }
 
 function step(dt) {
-  if (sim.rings.every(R => R.lost !== null) || sim.t > TMAX) { sim.wait += dt; if (sim.wait > PAUSE) { newTrial(); return; } }
+  if (!sim.synced && (sim.rings.every(R => R.lost !== null) || sim.t > TMAX)) { sim.wait += dt; if (sim.wait > PAUSE) { newTrial(); return; } }
   const n = Math.ceil(dt / 0.005), h = dt / n;
   for (let k = 0; k < n; k++) {
     sim.t += h;
-    sim.rings.forEach(R => {
-      const depth = DMAX * R.p * Math.exp(-sim.t / TAU), J = JC + JGAIN * (depth / ACRIT - 1);   // recurrent excitation decays like the valley
+    sim.rings.forEach((R, k) => {
+      const depth = DMAX * R.p * Math.exp(-sim.t / TAU);
+      let J = JC + JGAIN * (depth / ACRIT - 1);   // recurrent excitation decays like the valley
+      if (sim.synced) J = R.lost === null ? Math.max(J, JC + HOLD) : Math.min(J, 0.85);   // collapses when the ball is lost in model 3
       let cc = 0, ss = 0, m = 0;
       for (let j = 0; j < N; j++) { cc += R.r[j] * COS[j]; ss += R.r[j] * SIN[j]; m += R.r[j]; }
       cc *= 2 / N; ss *= 2 / N; m /= N;
@@ -59,7 +67,7 @@ function step(dt) {
         R.r[i] += h / TAUN * (-R.r[i] + Math.min(1, Math.max(0, hh)));
       }
       const m1 = Math.hypot(cc, ss); R.sm += h / 0.3 * (m1 - R.sm); R.psi = Math.atan2(ss, cc);
-      if (R.lost === null && sim.t > 0.8 && R.sm < LOST) R.lost = sim.t;
+      if (!sim.synced && R.lost === null && sim.t > 0.8 && R.sm < LOST) R.lost = sim.t;
     });
   }
 }
