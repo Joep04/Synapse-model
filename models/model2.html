@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="../bridge.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dopamine, working memory and MPH</title>
 <style>
@@ -10,35 +11,38 @@
     :root { --bg:#1a1a19; --fg:#ecebe5; --muted:#b4b2a9; --grid:#3a3a37; --card:#262624; --tab:#33332f; }
   }
   * { box-sizing: border-box; }
-  body { margin:0; padding:20px; background:var(--bg); color:var(--fg);
+  html, body { height: 100%; }
+  body { margin:0; padding:8px 10px; background:var(--bg); color:var(--fg); height:100vh; min-height:380px;
+         display:flex; flex-direction:column; gap:6px;
          font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width:1400px; margin:0 auto; }
-  h1 { font-size:20px; font-weight:600; margin:0 0 14px; }
-  #tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-  #tabs button { padding:9px 18px; border:1px solid var(--grid); border-radius:8px; background:var(--tab);
-                 color:var(--fg); font-size:14px; cursor:pointer; }
+  .top { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  #tabs { display:flex; flex-wrap:wrap; gap:6px; }
+  button { padding:5px 11px; border:1px solid var(--grid); border-radius:6px; background:var(--tab);
+           color:var(--fg); font-size:12px; cursor:pointer; }
   #tabs button.active { color:#fff; font-weight:600; border-color:transparent; }
-  .plots { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:16px; }
-  canvas { width:100%; height:480px; display:block; }
-  .card { background:var(--card); border-radius:10px; padding:14px 16px; margin-top:16px; }
-  #metrics { font-size:15px; font-weight:600; margin-bottom:6px; }
-  #desc { font-size:14px; color:var(--muted); line-height:1.6; }
-  .sliders { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px 32px; margin-top:16px; }
-  .sliders label { display:flex; justify-content:space-between; font-size:14px; margin-bottom:4px; }
-  .sliders input[type=range] { width:100%; }
-  #reset { padding:8px 16px; border:1px solid var(--grid); border-radius:8px; background:var(--tab);
-           color:var(--fg); cursor:pointer; font-size:14px; margin-top:16px; }
-  .note { font-size:12px; color:var(--muted); margin-top:16px; }
+  #reset { margin-left:auto; }
+  .plots { flex:1 1 auto; min-height:140px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .plots > div { position:relative; min-height:0; min-width:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .card { background:var(--card); border-radius:8px; padding:6px 10px; }
+  #metrics { font-size:12px; font-weight:600; margin-bottom:2px; }
+  #desc { font-size:11.5px; color:var(--muted); line-height:1.4; }
+  .sliders { display:grid; grid-template-columns:repeat(3,1fr); gap:4px 14px; }
+  .sliders label { display:flex; justify-content:space-between; font-size:11.5px; }
+  .sliders input[type=range] { width:100%; margin:2px 0 0; height:14px; }
+  .note { font-size:10.5px; color:var(--muted); margin:0; }
+  @media (max-width: 520px) { .plots { grid-template-columns:1fr; grid-auto-rows:1fr; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Inverted-U model: dopamine, working memory and methylphenidate (MPH)</h1>
-  <div id="tabs"></div>
+  <div class="top">
+    <div id="tabs"></div>
+    <button id="reset">Reset</button>
+  </div>
 
-  <div class="plots">
-    <canvas id="c1" role="img" aria-label="Inverted U curve of working memory performance against dopamine level"></canvas>
-    <canvas id="c2" role="img" aria-label="Dose-response curve of performance against MPH concentration"></canvas>
+  <div class="plots" id="plots">
+    <div><canvas id="c1" role="img" aria-label="Inverted U curve of working memory performance against dopamine level"></canvas></div>
+    <div><canvas id="c2" role="img" aria-label="Dose-response curve of performance against MPH concentration"></canvas></div>
   </div>
 
   <div class="card">
@@ -54,10 +58,8 @@
     <div><label for="mph"><span>MPH (ng/mL)</span><span id="mph-v"></span></label>
       <input type="range" id="mph" min="0" max="40" step="0.5" value="5"></div>
   </div>
-  <button id="reset">Reset</button>
 
-  <p class="note">Illustrative model, not a diagnostic or medical tool. Scale: relative dopamine from 0 to 4; a typical person sits at 2.0, which is also their optimum.</p>
-</div>
+  <p class="note">Illustrative model, not a diagnostic or medical tool. Relative dopamine 0&ndash;4; a typical person sits at 2.0 (their optimum).</p>
 
 <script>
 const DA_MAX = 4.0, OPTIMUM = 2.0, CURVE_WIDTH = 0.64;
@@ -74,7 +76,6 @@ const PROFILES = {
 };
 let current = "adhd";
 
-// Same formula as calculate_dopamine_shift in the Python script
 function calculateDopamineShift(conc, baseDa, eMax, ec50, maxInc) {
   const occupancy = (eMax * conc) / (ec50 + conc);
   return baseDa + maxInc * occupancy;
@@ -99,62 +100,75 @@ function compute(baseline, boost, p, conc) {
 const $ = id => document.getElementById(id);
 const css = () => getComputedStyle(document.documentElement);
 
+const K = (typeof PKPD !== "undefined") ? PKPD : null;
 function plot(cv, o) {
+  if (K && typeof K.plot === "function") {
+    try {
+      K.plot(cv, { x: o.curve.map(pt => pt.x), y: o.curve.map(pt => pt.y), xmax: o.xmax, ymax: 100,
+                   xlabel: o.xlabel, ylabel: o.ylabel, hline: o.hline, marker: o.marker });
+      return;
+    } catch (e) { console.warn("bridge.js plot failed, using built-in plot:", e); }
+  }
+  plotOwn(cv, o);
+}
+
+function plotOwn(cv, o) {
   const st = css(), fg = st.getPropertyValue("--fg").trim(),
         muted = st.getPropertyValue("--muted").trim(), grid = st.getPropertyValue("--grid").trim();
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext("2d");
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
-  const L = 62, R = 18, T = 40, B = 54, pw = W - L - R, ph = H - T - B, YMAX = 105;
+  const L = 40, R = 10, T = 24, B = 34, pw = W - L - R, ph = H - T - B, YMAX = 105;
   const X = x => L + (x / o.xmax) * pw, Y = y => T + ph - (y / YMAX) * ph;
 
-  g.font = "12px system-ui, sans-serif"; g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
+  g.font = "10px system-ui, sans-serif"; g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
   g.textAlign = "right"; g.textBaseline = "middle";
   for (let y = 0; y <= 100; y += 20) {
     g.beginPath(); g.moveTo(L, Y(y)); g.lineTo(L + pw, Y(y)); g.stroke();
-    g.fillText(String(y), L - 8, Y(y));
+    g.fillText(String(y), L - 5, Y(y));
   }
   g.textAlign = "center"; g.textBaseline = "top";
-  for (let x = 0; x <= o.xmax + 1e-9; x += o.xstep) g.fillText(String(+x.toFixed(2)), X(x), T + ph + 8);
+  for (let x = 0; x <= o.xmax + 1e-9; x += o.xstep) g.fillText(String(+x.toFixed(2)), X(x), T + ph + 4);
 
   g.strokeStyle = muted;
   g.strokeRect(L, T, pw, ph);
 
-  g.fillStyle = fg; g.font = "13px system-ui, sans-serif";
+  g.fillStyle = fg; g.font = "10.5px system-ui, sans-serif";
   g.textAlign = "center"; g.textBaseline = "alphabetic";
-  g.fillText(o.xlabel, L + pw / 2, H - 10);
-  g.save(); g.translate(16, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
-  g.font = "600 15px system-ui, sans-serif"; g.fillText(o.title, L + pw / 2, 24);
+  g.fillText(o.xlabel, L + pw / 2, H - 5);
+  g.save(); g.translate(10, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText(o.ylabel, 0, 0); g.restore();
+  g.font = "600 12px system-ui, sans-serif"; g.fillText(o.title, L + pw / 2, 15);
 
   g.beginPath();
   o.curve.forEach((pt, i) => i ? g.lineTo(X(pt.x), Y(pt.y)) : g.moveTo(X(pt.x), Y(pt.y)));
-  g.strokeStyle = o.color; g.lineWidth = 3; g.stroke();
+  g.strokeStyle = o.color; g.lineWidth = 2.5; g.stroke();
 
   if (o.vline !== undefined) {
-    g.setLineDash([2, 4]); g.strokeStyle = muted; g.lineWidth = 1.2;
+    g.setLineDash([2, 3]); g.strokeStyle = muted; g.lineWidth = 1;
     g.beginPath(); g.moveTo(X(o.vline), T); g.lineTo(X(o.vline), T + ph); g.stroke(); g.setLineDash([]);
   }
   if (o.dashed) {
-    g.setLineDash([6, 4]); g.strokeStyle = muted; g.lineWidth = 1.4;
+    g.setLineDash([5, 3]); g.strokeStyle = muted; g.lineWidth = 1.2;
     g.beginPath(); g.moveTo(X(o.dashed[0].x), Y(o.dashed[0].y)); g.lineTo(X(o.dashed[1].x), Y(o.dashed[1].y));
     g.stroke(); g.setLineDash([]);
   }
   o.markers.forEach(m => {
     g.fillStyle = m.color; g.beginPath();
-    if (m.shape === "circle") g.arc(X(m.x), Y(m.y), 8, 0, 2 * Math.PI);
-    else { const cx = X(m.x), cy = Y(m.y); g.moveTo(cx, cy - 10); g.lineTo(cx + 9, cy + 7); g.lineTo(cx - 9, cy + 7); g.closePath(); }
+    if (m.shape === "circle") g.arc(X(m.x), Y(m.y), 5.5, 0, 2 * Math.PI);
+    else { const cx = X(m.x), cy = Y(m.y); g.moveTo(cx, cy - 7); g.lineTo(cx + 6.5, cy + 5); g.lineTo(cx - 6.5, cy + 5); g.closePath(); }
     g.fill();
   });
-  if (o.legend) {
-    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "12px system-ui, sans-serif";
+  if (o.legend && pw > 230) {
+    g.textAlign = "left"; g.textBaseline = "middle"; g.font = "10px system-ui, sans-serif";
     o.legend.forEach((l, i) => {
-      const lx = L + 14, ly = T + 18 + i * 20;
+      const lx = L + 12, ly = T + 12 + i * 15;
       g.fillStyle = l.color; g.beginPath();
-      if (l.shape === "circle") g.arc(lx, ly, 6, 0, 2 * Math.PI);
-      else { g.moveTo(lx, ly - 7); g.lineTo(lx + 7, ly + 5); g.lineTo(lx - 7, ly + 5); g.closePath(); }
-      g.fill(); g.fillStyle = fg; g.fillText(l.label, lx + 14, ly);
+      if (l.shape === "circle") g.arc(lx, ly, 4.5, 0, 2 * Math.PI);
+      else { g.moveTo(lx, ly - 5); g.lineTo(lx + 5, ly + 4); g.lineTo(lx - 5, ly + 4); g.closePath(); }
+      g.fill(); g.fillStyle = fg; g.fillText(l.label, lx + 10, ly);
     });
   }
 }
@@ -164,14 +178,15 @@ function update() {
   const p = PROFILES[current], s = compute(baseline, boost, p, conc);
   $("baseline-v").textContent = baseline.toFixed(2);
   $("boost-v").textContent = (boost >= 0 ? "+" : "") + boost.toFixed(2);
-  $("mph-v").textContent = conc.toFixed(1) + " ng/mL";
+  $("mph-v").textContent = conc.toFixed(1);
 
   const curve1 = [];
   for (let i = 0; i <= 300; i++) { const x = i * DA_MAX / 300; curve1.push({ x, y: performance(x, s.width) }); }
   plot($("c1"), {
     xmax: DA_MAX, xstep: 0.5, color: p.color, curve: curve1,
-    xlabel: "Dopamine (relative units)", ylabel: "Working memory performance (%)",
-    title: "Inverted U: dopamine and performance",
+    xlabel: "Dopamine (relative units)", ylabel: "Performance (%)",
+    title: "Inverted U",
+    hline: s.p0, marker: { x: s.after, y: s.p1 },
     dashed: [{ x: s.start, y: s.p0 }, { x: s.after, y: s.p1 }],
     markers: [{ x: s.start, y: s.p0, color: "#eb6834", shape: "circle" },
               { x: s.after, y: s.p1, color: "#1baf7a", shape: "triangle" }],
@@ -182,16 +197,17 @@ function update() {
   const curve2 = [];
   for (let i = 0; i <= 160; i++) { const c = i * 0.25; curve2.push({ x: c, y: compute(baseline, boost, p, c).p1 }); }
   plot($("c2"), {
-    xmax: 40, xstep: 5, color: p.color, curve: curve2, vline: conc,
-    xlabel: "MPH concentration (ng/mL)", ylabel: "Working memory performance (%)",
+    xmax: 40, xstep: 10, color: p.color, curve: curve2, vline: conc,
+    xlabel: "MPH concentration (ng/mL)", ylabel: "Performance (%)",
     title: "Dose-response: " + p.name,
+    hline: s.p0, marker: { x: conc, y: s.p1 },
     markers: [{ x: conc, y: s.p1, color: "#1baf7a", shape: "triangle" }]
   });
 
   const change = s.p1 - s.p0;
   $("metrics").textContent = p.name + ":  performance " + Math.round(s.p0) + "% \u2192 " + Math.round(s.p1) + "% (" +
-    (change >= 0 ? "+" : "") + Math.round(change) + " points)   |   DAT occupancy " + Math.round(s.occupancy * 100) +
-    "%   |   " + zone(s.after, s.width);
+    (change >= 0 ? "+" : "") + Math.round(change) + " points)  |  DAT occupancy " + Math.round(s.occupancy * 100) +
+    "%  |  " + zone(s.after, s.width);
   $("desc").textContent = p.text;
 
   document.querySelectorAll("#tabs button").forEach(b => {
@@ -212,8 +228,10 @@ Object.entries(PROFILES).forEach(([key, p]) => {
 $("reset").addEventListener("click", () => {
   Object.keys(DEFAULTS).forEach(k => $(k).value = DEFAULTS[k]); update();
 });
-window.addEventListener("resize", update);
+if (K && typeof K.onUpdate === "function") K.onUpdate(() => update());
+if (typeof ResizeObserver !== "undefined") new ResizeObserver(update).observe($("plots"));
+else window.addEventListener("resize", update);
 update();
 </script>
 </body>
-</html> 
+</html>
