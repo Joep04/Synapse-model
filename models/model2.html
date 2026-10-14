@@ -2,42 +2,20 @@
 <html><head><meta charset="utf-8"><script src="../bridge.js"></script>
 <style>
 body{display:flex;flex-direction:column;gap:6px;color:var(--ink);font-family:var(--sans)}
-#tabs{display:flex;gap:6px;flex:none;padding-top:2px}
-#tabs button{font:500 12px var(--sans);padding:3px 11px;border:1px solid var(--line);border-radius:999px;background:none;color:var(--mute);cursor:pointer}
-#tabs button[aria-pressed=true]{background:var(--da);border-color:var(--da);color:var(--panel)}
-#tabs button:focus-visible{outline:2px solid var(--da);outline-offset:2px}
 .plots{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .plots div{position:relative;min-width:0;min-height:0}
 canvas{position:absolute;inset:0}
 </style></head>
 <body>
-<div id="tabs"></div>
 <div class="plots">
   <div><canvas id="c1" role="img" aria-label="Inverted U: performance against dopamine level"></canvas></div>
   <div><canvas id="c2" role="img" aria-label="Performance against methylphenidate concentration"></canvas></div>
 </div>
 <script>
 const K = PKPD;
-// The sidebar sliders drive this model: p.da -> baseline dopamine, p.mph -> methylphenidate (ng/mL).
-const DA_SLIDER_MAX = 90,   // max of the dopamine slider in index.html
-      DA_MAX = 4.0, OPTIMUM = 2.0, CURVE_WIDTH = 0.64,
-      BOOST = 0.0;          // extra dopamine boost (the old "extra boost" slider)
-const MPH = { ec50: 4.5, eMax: 1.0, maxInc: 2.5 };
-const PROFILES = {
-  typical: { name: 'Typical',           dl: 0.0,  db: 0.0, wm: 1.0 },
-  adhd:    { name: 'ADHD',              dl: -1.0, db: 0.0, wm: 1.0 },
-  anxiety: { name: 'Anxiety or stress', dl: 0.2,  db: 0.6, wm: 0.875 }
-};
-let current = 'adhd', P = K.params;
-
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const performance = (da, w) => 100 * Math.exp(-Math.pow(da - OPTIMUM, 2) / (2 * w * w));
-function compute(baseline, conc, p) {
-  const start = clamp(baseline + p.dl + p.db, 0, DA_MAX), width = CURVE_WIDTH * p.wm;
-  const occupancy = MPH.eMax * conc / (MPH.ec50 + conc);
-  const after = clamp(start + MPH.maxInc * occupancy + BOOST, 0, DA_MAX);   // p.db (stress surge) is part of the starting level, so MPH = 0 gives medicated = unmedicated
-  return { start, after, p0: performance(start, width), p1: performance(after, width), width };
-}
+// Driven by the sidebar: p.da = baseline dopamine, p.mph = methylphenidate (ng/mL), p.profile = Typical / ADHD / Anxiety.
+// The paper-based values (profiles, MPH curve, optimum) live in bridge.js (PKPD.PAPER, PKPD.PROFILES, PKPD.compute).
+let P = K.params;
 
 function draw(cv, o) {
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
@@ -80,29 +58,22 @@ function draw(cv, o) {
 }
 
 function update() {
-  const baseline = clamp(P.da / DA_SLIDER_MAX * DA_MAX, 0, DA_MAX), conc = P.mph, p = PROFILES[current];
-  const s = compute(baseline, conc, p), grey = K.css('--mute'), violet = K.css('--mph');
-  const xs = K.linspace(0, DA_MAX, 200);
+  const baseline = P.da, conc = P.mph, s = K.compute(baseline, conc, P.profile), name = K.PROFILES[P.profile].name;
+  const grey = K.css('--mute'), violet = K.css('--mph'), xs = K.linspace(0, K.PAPER.DA_MAX, 200);
   draw(document.getElementById('c1'), {
-    x: xs, y: xs.map(x => performance(x, s.width)), xmax: DA_MAX, xstep: 1, title: 'Inverted U', xlabel: 'Dopamine (relative units)',
+    x: xs, y: xs.map(x => K.performance(x, s.width)), xmax: K.PAPER.DA_MAX, xstep: 1, title: 'Inverted U', xlabel: 'Dopamine (relative units)',
     hline: s.p0, link: [{ x: s.start, y: s.p0 }, { x: s.after, y: s.p1 }],
     markers: [{ x: s.start, y: s.p0, color: grey }, { x: s.after, y: s.p1, color: violet }],
     legend: [{ label: 'Unmedicated  ' + Math.round(s.p0) + '%', color: grey }, { label: 'Medicated  ' + Math.round(s.p1) + '%', color: violet }]
   });
-  const cs = K.linspace(0, 50, 200);
+  const cs = K.linspace(0, 40, 200);
   draw(document.getElementById('c2'), {
-    x: cs, y: cs.map(c => compute(baseline, c, p).p1), xmax: 50, xstep: 10, title: 'Dose-response', xlabel: 'Methylphenidate (ng/mL)',
+    x: cs, y: cs.map(c => K.compute(baseline, c, P.profile).p1), xmax: 40, xstep: 10, title: 'Dose-response: ' + name, xlabel: 'Methylphenidate (ng/mL)',
     hline: s.p0, vline: conc, markers: [{ x: conc, y: s.p1, color: violet }]
   });
-  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.key === current));
   // Output to models 3 and 4 (0-1)
   K.share({ perfUnmedicated: Math.round(s.p0) / 100, perfMedicated: Math.round(s.p1) / 100 });
 }
 
-Object.entries(PROFILES).forEach(([key, p]) => {
-  const b = document.createElement('button'); b.textContent = p.name; b.dataset.key = key;
-  b.addEventListener('click', () => { current = key; update(); });
-  document.getElementById('tabs').appendChild(b);
-});
 K.onUpdate(p => { P = p; update(); });
 </script></body></html>

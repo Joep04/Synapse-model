@@ -3,7 +3,7 @@
 <body><canvas id="c"></canvas>
 <script>
 const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
-let P = K.params, W = 0, H = 0, orbs = [], last = performance.now(), acc = 0;
+let P = K.params, rate = 10, W = 0, H = 0, orbs = [], last = performance.now(), acc = 0;
 const NR = 6, NT = 5, busy = Array(NR).fill(false);
 const col = {};
 K.onUpdate(p => { P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n)); });
@@ -16,7 +16,7 @@ function fit() {
 const datX = i => W * (0.08 + 0.84 * i / (NT - 1)), recX = i => W * (0.12 + 0.76 * i / (NR - 1));
 
 function step(dt, preY, postY, b) {
-  acc += P.da / 4 * dt;
+  acc += rate * dt;
   while (acc >= 1) { acc--; if (orbs.length < 350) orbs.push({ x: W * (0.04 + 0.92 * Math.random()), y: preY + 5, vx: 0, vy: 25, r: -1, t: 0 }); }
   const damp = Math.exp(-4 * dt);
   orbs = orbs.filter(o => {
@@ -65,7 +65,8 @@ function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   fit();
   if (W && col['--da']) {
-    const preY = H * 0.3, postY = H * 0.74, mn = P.mph * K.consts.ngToNM, b = mn / (mn + K.consts.Ki);
+    const preY = H * 0.3, postY = H * 0.74, s = K.compute(P.da, P.mph, P.profile), b = s.occupancy;
+    rate = 22 * s.start / K.PAPER.DA_MAX;   // orbs released per second follow the (profile-adjusted) dopamine level
     step(dt, preY, postY, b); draw(preY, postY, b);
   }
   requestAnimationFrame(loop);
