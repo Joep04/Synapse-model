@@ -85,7 +85,7 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
   <h1>Dopamine & methylphenidate<span>Synaptic uptake models</span></h1>
   <div><div class="cap">Profile</div><div class="profile" id="profile"></div></div>
   <div class="ctl"><label for="da">Baseline dopamine <output id="daOut"></output></label>
-    <input id="da" type="range" min="0" max="4" step="0.01" value="2"></div>
+    <input id="da" type="range" min="0" max="4" step="0.01" value="1"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
     <input id="mph" type="range" min="0" max="40" step="0.5" value="5"></div>
   <div class="readout">
@@ -116,7 +116,7 @@ const MODELS = [
   { file: 'models/model4.html', title: '4. Ring attractor', caption: 'Neurons on a ring hold the memory as a bump of firing. Recurrent excitation decays like the valley in model 3; the bump fades and the memory is lost. Click to restart.', height: 270 }
 ];
 
-const K = PKPD, params = { da: 2, mph: 5, profile: 'adhd' };
+const K = PKPD, params = { da: 1, mph: 5, profile: 'adhd' };
 const THEME = ['--panel','--ink','--mute','--line','--da','--mph','--curve','--sans'];
 const frames = [], shared = {};
 
@@ -191,13 +191,17 @@ const profileBox = document.getElementById('profile');
 Object.entries(K.PROFILES).forEach(([key, p]) => {
   const b = document.createElement('button'); b.textContent = p.name; b.dataset.key = key;
   b.setAttribute('aria-pressed', key === params.profile);
-  b.addEventListener('click', () => {
-    params.profile = key;
-    profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.key === key));
-    readouts(); sendAll();
-  });
+  b.addEventListener('click', () => applyProfile(key));
   profileBox.appendChild(b);
 });
+// A profile moves the baseline dopamine slider to its starting level; you can still adjust it afterwards.
+function applyProfile(key) {
+  params.profile = key;
+  profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.key === key));
+  const el = document.getElementById('da'); el.value = K.PROFILES[key].start;
+  el.dispatchEvent(new Event('input'));
+}
+applyProfile(params.profile);
 
 if (document.fonts) document.fonts.ready.then(sendAll);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(sendAll, 50));
