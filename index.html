@@ -28,6 +28,8 @@ aside h1 span{display:block;font:400 .85rem var(--sans);color:var(--side-mute);m
 .profile button{font:500 .8rem var(--sans);padding:4px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:none;color:var(--side-ink);cursor:pointer}
 .profile button[aria-pressed=true]{background:var(--side-da);border-color:var(--side-da);color:var(--side)}
 .profile button:focus-visible{outline:2px solid var(--side-da);outline-offset:2px}
+.speed{font:500 .8rem var(--sans);padding:4px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:none;color:var(--side-ink);cursor:pointer}
+.speed:hover{border-color:var(--side-da)} .speed:focus-visible{outline:2px solid var(--side-da);outline-offset:2px}
 .ctl label{display:flex;justify-content:space-between;align-items:baseline;font-weight:500;margin-bottom:10px}
 .ctl output{font:600 1.7rem var(--serif);font-variant-numeric:tabular-nums}
 .ctl output small{font:400 .8rem var(--sans);color:var(--side-mute);margin-left:4px}
@@ -89,6 +91,7 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
     <input id="da" type="range" min="0" max="4" step="0.1" value="1"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
     <input id="mph" type="range" min="0" max="40" step="0.5" value="3"></div>
+  <div><div class="cap">Simulation speed</div><button class="speed" id="speed" title="Speeds up the valley and ring models">Speed &times;1</button></div>
   </div>
 </aside>
 
@@ -113,7 +116,7 @@ const MODELS = [
   { file: 'models/model3.html', title: '4. Valley model', caption: 'Working memory can be seen like a ball in a valley: The valley decays, when the ball rolls out, the memory is lost. Click to restart.', height: 270 }
 ];
 
-const K = PKPD, params = { da: 1, mph: 3, profile: 'adhd' };
+const K = PKPD, params = { da: 1, mph: 3, profile: 'adhd', speed: 1 };
 const THEME = ['--panel','--ink','--mute','--line','--da','--mph','--curve','--sans'];
 const frames = [], shared = {};
 
@@ -210,7 +213,14 @@ applyProfile(params.profile);
   profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false'));
   readouts(); sendAll();
 }));
-
+// Speed-up button: cycles the speed of the memory models (valley + ring)
+const SPEEDS = [1, 2, 5, 10], speedBtn = document.getElementById('speed');
+speedBtn.addEventListener('click', () => {
+  params.speed = SPEEDS[(SPEEDS.indexOf(params.speed) + 1) % SPEEDS.length];
+  speedBtn.textContent = `Speed \u00d7${params.speed}`;
+  sendAll();
+});
+  
 if (document.fonts) document.fonts.ready.then(sendAll);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(sendAll, 50));
 </script>
