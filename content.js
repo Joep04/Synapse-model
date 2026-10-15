@@ -36,9 +36,9 @@ D1 receptors are involved in memory, attention, impulse control, regulation of r
 3. Too little stimulation: Neuronal activity can be noisy, so the preferred location is not represented clearly. 
 
 Psychopharmacological studies with human volunteers indicate that the effect of dopaminergic drug administration depends on baseline level of performance. It improved cognition in subjects with lower baseline working-memory, and worsening cognition in those with higher baseline working memory capacity. 
-1. Low baseline (Our ADHD stand-in): There is too little stimulation of the D1 receptors. The dose moves the individual towards the peak, so performance increases. 
-2. Near peak baseline: There is moderate stimulation and the working-memory performance is already in the optimal zone. A dose gives little benefit. 
-3. High baseline: A dose pushes the individual past the peak. Resulting in excessive stimulation of the D1 receptor, and thus worsening working-memory performance.  
+1. Low baseline (Our ADHD stand-in): There is too little stimulation of the D1 receptors. The dose moves the individual towards the peak, so performance increases. \n
+2. Near peak baseline: There is moderate stimulation and the working-memory performance is already in the optimal zone. A dose gives little benefit. \n
+3. High baseline: A dose pushes the individual past the peak. Resulting in excessive stimulation of the D1 receptor, and thus worsening working-memory performance. \n
 
 `
     },
