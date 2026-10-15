@@ -85,4 +85,4 @@ const PKPD = (() => {
     addEventListener('load', emit);
   }
   return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate, share, PAPER, PROFILES, performance, occupancy, compute };
-})(); 
+})();
