@@ -120,7 +120,7 @@ function update() {
   });
   const cs = K.linspace(0, 40, 200);
   draw(document.getElementById('c2'), {
-    x: cs, y: cs.map(c => K.compute(baseline, c, P.profile).p1), xmax: 40, xstep: 10, title: 'Dose-response: ' + name, xlabel: 'Methylphenidate (ng/mL)',
+    x: cs, y: cs.map(c => K.compute(baseline, c, P.profile).p1), xmax: 60, xstep: 10, title: 'Dose-response: ' + name, xlabel: 'Methylphenidate (Mg)',
     hline: s.p0, vline: conc, markers: [{ x: conc, y: s.p1, color: violet }]
   });
   // Output to models 3 and 4 (0-1)
