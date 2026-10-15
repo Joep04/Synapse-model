@@ -9,11 +9,47 @@ canvas{position:absolute;inset:0}
 <body>
 <div class="plots">
   <div><canvas id="c1" role="img" aria-label="Inverted U: performance against dopamine level"></canvas></div>
-  <div><canvas id="c2" role="img" aria-label="Performance against methylphenidate dose"></canvas></div>
+  <div><canvas id="c2" role="img" aria-label="Performance against methylphenidate concentration"></canvas></div>
 </div>
 <script>
+/**
+ * Calculates transporter occupancy and the resulting extracellular dopamine increase 
+ * based on a given oral dose of methylphenidate (MPH) and body weight.
+ * 
+ * @param {number} doseMg - The dose of MPH in milligrams (mg)
+ * @param {number} weightKg - Patient body weight in kilograms (default = 70 kg)
+ * @returns {Object} An object containing the occupancy percentage and dopamine increase percentage
+ */
+function calculateDopamineIncrease(doseMg, weightKg = 70) {
+    // 1. Calculate ED50 in mg based on body weight (0.25 mg/kg from PET data)
+    const ed50Mg = 0.25 * weightKg; 
+    const eMax = 0.90; // Maximum possible transporter blockade (90%)
+    const n = 1.35;    // Hill coefficient for curve steepness
+
+    if (doseMg <= 0) {
+        return { occupancy: 0, daIncrease: 0 };
+    }
+
+    // Step A: Calculate the fraction of occupied transporters (O between 0 and 1) using the Hill equation
+    const dosePow = Math.pow(doseMg, n);
+    const ed50Pow = Math.pow(ed50Mg, n);
+    const occupancyFraction = (eMax * dosePow) / (ed50Pow + dosePow);
+
+    // Step B: Calculate dopamine increase based on the open (unoccupied) fraction
+    // Reuptake clearance is inversely proportional to the unoccupied fraction (1 - occupancyFraction)
+    const dopamineMultiplier = 1 / (1 - occupancyFraction);
+    
+    // Convert to percentage increase relative to baseline (0% = no change)
+    const percentageIncrease = (dopamineMultiplier - 1) * 100;
+
+    return {
+        occupancy: occupancyFraction * 100, // Transporter occupancy in %
+        daIncrease: percentageIncrease       // Dopamine increase relative to baseline in %
+    };
+}
+
 const K = PKPD;
-// Driven by the sidebar: p.daPct = baseline dopamine (%), p.mg = methylphenidate (mg), p.sens = receptor sensitivity (%), p.profile.
+// Driven by the sidebar: p.da = baseline dopamine, p.mph = methylphenidate (ng/mL), p.profile = Typical / ADHD / Anxiety.
 // The paper-based values (profiles, MPH curve, optimum) live in bridge.js (PKPD.PAPER, PKPD.PROFILES, PKPD.compute).
 let P = K.params;
 
@@ -74,22 +110,23 @@ function draw(cv, o) {
 }
 
 function update() {
-  const s = K.compute(P.daPct, P.mg, P.sens, P.profile), name = (K.PROFILES[P.profile] || { name: 'Custom' }).name;
+  const baseline = P.da, conc = P.mph, s = K.compute(baseline, conc, P.profile), name = (K.PROFILES[P.profile] || { name: 'Custom' }).name;
   const grey = K.css('--mute'), violet = K.css('--mph'), xs = K.linspace(0, K.PAPER.DA_MAX, 200);
   draw(document.getElementById('c1'), {
-    x: xs, y: xs.map(x => K.performance(x, s.width)), xmax: K.PAPER.DA_MAX, xstep: 50, title: 'Inverted U', xlabel: 'D1 stimulation (% of optimum)',
+    x: xs, y: xs.map(x => K.performance(x, s.width)), xmax: K.PAPER.DA_MAX, xstep: 1, title: 'Inverted U', xlabel: 'Dopamine (relative units)',
     hline: s.p0, hline2: s.p1, hline2Color: violet, link: [{ x: s.start, y: s.p0 }, { x: s.after, y: s.p1 }],
     markers: [{ x: s.start, y: s.p0, color: grey }, { x: s.after, y: s.p1, color: violet }],
     legend: [{ label: 'Unmedicated  ' + Math.round(s.p0) + '%', color: grey }, { label: 'Medicated  ' + Math.round(s.p1) + '%', color: violet }]
   });
-  const ds = K.linspace(0, K.PAPER.MPH.maxMg, 200);
+  const cs = K.linspace(0, 40, 200);
   draw(document.getElementById('c2'), {
-    x: ds, y: ds.map(d => K.compute(P.daPct, d, P.sens, P.profile).p1), xmax: K.PAPER.MPH.maxMg, xstep: 10, title: 'Dose-response: ' + name, xlabel: 'Methylphenidate (mg)',
-    hline: s.p0, vline: P.mg, markers: [{ x: P.mg, y: s.p1, color: violet }]
+    x: cs, y: cs.map(c => K.compute(baseline, c, P.profile).p1), xmax: 40, xstep: 10, title: 'Dose-response: ' + name, xlabel: 'Methylphenidate (ng/mL)',
+    hline: s.p0, vline: conc, markers: [{ x: conc, y: s.p1, color: violet }]
   });
   // Output to models 3 and 4 (0-1)
   K.share({ perfUnmedicated: Math.round(s.p0) / 100, perfMedicated: Math.round(s.p1) / 100 });
 }
 
 K.onUpdate(p => { P = p; update(); });
-</script></body></html>
+</script></body></html> 
+
