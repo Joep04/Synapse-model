@@ -2,42 +2,28 @@
 // Model files only need:  PKPD.onUpdate(p => { ...draw using p.da, p.mph... });
 const PKPD = (() => {
   const consts = { Vmax: 100, Km: 200, Ki: 100, ngToNM: 4.28, Kd: 500 }; // nM/s, nM, nM, nM per ng/mL, nM
-  const params = { da: 1, mph: 3, daPct: 100, mg: 20, sens: 100, profile: 'adhd', shared: {} };   // da (0-4) and mph (ng/mL) are legacy units for model 1; daPct (%), mg and sens (%) are the new slider units
+  const params = { da: 1, mph: 3, profile: 'adhd', shared: {} };   // da = baseline dopamine (0-4), mph = ng/mL      // da = release rate (nM/s), mph = plasma conc (ng/mL)
   const subs = [];
   const kApp = mph => consts.Km * (1 + (mph * consts.ngToNM) / consts.Ki);
   const uptake = (C, mph) => consts.Vmax * C / (kApp(mph) + C);
   const steadyState = (R, mph) => R >= consts.Vmax ? Infinity : R * kApp(mph) / (consts.Vmax - R);
-  // ---- Paper-based model ----
-  // Units: baseline dopamine B and receptor sensitivity S in % (100 = typical / optimal), methylphenidate dose in mg.
-  // Occupancy: Hill curve, ED50 = 0.25 mg/kg x 70 kg = 17.5 mg (PET data on oral MPH), Emax 0.9, n 1.35.
-  // f = share of dopamine clearance that depends on DAT (prefrontal cortex also clears dopamine via NET/COMT).
-  // Performance: Gaussian inverted U around the optimum (100 %) with sigma = 32 %.
-  const PAPER = { DA_MAX: 200, OPTIMUM: 100, CURVE_WIDTH: 32,
-    MPH: { weightKg: 70, edPerKg: 0.25, eMax: 0.9, n: 1.35, f: 0.5, maxMg: 60 } };
-  // start = baseline dopamine (%), sens = receptor sensitivity (%), mph = dose (mg) the profile sets on the sliders.
-  // ADHD values from Volkow et al. 2009 (PET, adults with ADHD vs controls):
-  //   DAT   accumbens 89 %, caudate 80 %, midbrain 56 % of control  -> baseline dopamine (fewer/less active terminals)
-  //   D2/D3 accumbens 94 %, caudate 88 %, midbrain 64 % of control  -> receptor sensitivity
+  // ---- Paper-based model (values from the original model 2) ----
+  const PAPER = { DA_MAX: 4.0, OPTIMUM: 2.0, CURVE_WIDTH: 0.64, BOOST: 0.0, MPH: { ec50: 4.5, eMax: 1.0, maxInc: 2.5 } };
+  // start = baseline dopamine and mph = methylphenidate (ng/mL) the profile sets on the sliders
+  // (start = 2.0 + the profile's shift in the original model 2: ADHD -1.0, Anxiety +0.2 stress +0.6 surge).
+  // wm = curve width factor (tolerance).
   const PROFILES = {
-    typical: { name: 'Typical',            start: 100, sens: 100, mph: 0,  wm: 1.0 },
-    adhd:    { name: 'ADHD (striatum)',    start: 85,  sens: 90,  mph: 20, wm: 1.0 },
-    adhdmid: { name: 'ADHD (midbrain)',    start: 60,  sens: 65,  mph: 20, wm: 1.0 },
-    anxiety: { name: 'Anxiety or stress',  start: 140, sens: 100, mph: 0,  wm: 1.0 }
+    typical: { name: 'Typical',           start: 2.0, mph: 0, wm: 1.0 },
+    adhd:    { name: 'ADHD',              start: 1.0, mph: 3, wm: 1.0 },
+    anxiety: { name: 'Anxiety or stress', start: 2.8, mph: 0, wm: 1.0 }
   };
   const clamp = (v, a, c) => Math.min(c, Math.max(a, v));
-  const performance = (x, w) => 100 * Math.exp(-Math.pow(x - PAPER.OPTIMUM, 2) / (2 * w * w));
-  const occupancy = mg => {              // fraction of transporters blocked (0-1)
-    if (mg <= 0) return 0;
-    const M = PAPER.MPH, ed = M.edPerKg * M.weightKg, a = Math.pow(mg, M.n), b = Math.pow(ed, M.n);
-    return M.eMax * a / (b + a);
-  };
-  const daMultiplier = mg => 1 / (1 - PAPER.MPH.f * occupancy(mg));
-  // Model 1 still uses ng/mL: the concentration that gives the same blocked fraction on its own curve (ec50 4.5, eMax 1)
-  const legacyConc = mg => { const o = occupancy(mg); return 4.5 * o / (1 - o); };
-  function compute(baseline, mg, sens, profile) {   // start = D1 stimulation unmedicated, after = on MPH
-    const p = PROFILES[profile] || PROFILES.typical, occ = occupancy(mg), width = PAPER.CURVE_WIDTH * p.wm;
-    const start = clamp(baseline * sens / 100, 0, PAPER.DA_MAX);
-    const after = clamp(baseline * daMultiplier(mg) * sens / 100, 0, PAPER.DA_MAX);
+  const performance = (da, w) => 100 * Math.exp(-Math.pow(da - PAPER.OPTIMUM, 2) / (2 * w * w));
+  const occupancy = conc => PAPER.MPH.eMax * conc / (PAPER.MPH.ec50 + conc);
+  function compute(baseline, conc, profile) {   // start = unmedicated level, after = level on MPH
+    const p = PROFILES[profile] || PROFILES.typical, occ = occupancy(conc), width = PAPER.CURVE_WIDTH * p.wm;
+    const start = clamp(baseline, 0, PAPER.DA_MAX);
+    const after = clamp(start + PAPER.MPH.maxInc * occ + PAPER.BOOST, 0, PAPER.DA_MAX);
     return { start, after, width, occupancy: occ, p0: performance(start, width), p1: performance(after, width) };
   }
   const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
@@ -98,5 +84,5 @@ const PKPD = (() => {
     addEventListener('resize', emit);
     addEventListener('load', emit);
   }
-  return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate, share, PAPER, PROFILES, performance, occupancy, daMultiplier, legacyConc, compute };
+  return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate, share, PAPER, PROFILES, performance, occupancy, compute };
 })();
