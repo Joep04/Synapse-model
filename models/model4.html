@@ -5,20 +5,19 @@
 const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
 
 const FALLBACK = { base: 0.45, med: 0.75 };
-const N = 48;                 // Number of excitatory neurons on the ring
-const TAUN = 0.02;            // Membrane time constant (~20 ms)
-const TAUNMDA = 0.100;        // NMDA gating decay time constant (100 ms) [Compte et al. 2000]
-const SIG = 0.12;             // Internal background synaptic noise
+const N = 48;                 // Excitatory neurons on the ring
+const TAUN = 0.02;            // Membrane time constant (20 ms)
+const TAUNMDA = 0.100;        // Slow NMDA decay constant (100 ms) [Compte et al. 2000]
+const SIG = 0.08;             // Background noise
 
-// Network spatial spatial tuning parameters (Compte et al., 2000)
 const SIGMA_EE = (18 * Math.PI) / 180; // Footprint width sigma = 18 degrees
 const TH = Array.from({ length: N }, (_, i) => 2 * Math.PI * i / N);
 
-// Precompute Gaussian Structured Connectivity Matrix W_EE(theta_i - theta_j)
+// Gaussian Footprint Matrix W_EE(theta_i - theta_j) [Compte et al. 2000]
 const W = Array.from({ length: N }, (_, i) => 
   Float64Array.from({ length: N }, (_, j) => {
     let diff = Math.abs(TH[i] - TH[j]);
-    if (diff > Math.PI) diff = 2 * Math.PI - diff; // Wrap around ring
+    if (diff > Math.PI) diff = 2 * Math.PI - diff;
     const J_plus = 1.62;
     const J_minus = 0.40;
     return J_minus + (J_plus - J_minus) * Math.exp(-(diff * diff) / (2 * SIGMA_EE * SIGMA_EE));
@@ -39,25 +38,17 @@ function newTrial(trial) {
     wait: 0,
     th0: Math.random() * 2 * Math.PI,
     rings: [
-      { name: 'Unmedicated (Control)', isMed: false },
-      { name: 'Medicated (+DA Modulation)', isMed: true }
-    ].map(cfg => {
-      // Compte et al. Dopaminergic Modulation Set:
-      // Control: Base conductances
-      // Medicated (+DA): +20% NMDA recurrent excitation, +40% GABA recurrent inhibition
-      const g_NMDA = cfg.isMed ? 1.20 : 1.00;
-      const g_GABA = cfg.isMed ? 1.40 : 1.00;
-      return {
-        ...cfg,
-        g_NMDA,
-        g_GABA,
-        r: Float64Array.from({ length: N }, () => 0.05 + 0.02 * Math.random()), // firing rates (Hz/max)
-        s_NMDA: Float64Array.from({ length: N }, () => 0.05),                  // NMDA synaptic gating variables
-        sm: 0,
-        psi: 0,
-        lost: null
-      };
-    })
+      { name: 'Low Dopamine',  g_NMDA: 0.60, g_GABA: 0.60, colorKey: '--mute' },
+      { name: 'Optimal DA',    g_NMDA: 1.00, g_GABA: 1.00, colorKey: '--mph'  },
+      { name: 'High Dopamine', g_NMDA: 1.35, g_GABA: 1.50, colorKey: '--da'   }
+    ].map(cfg => ({
+      ...cfg,
+      r: Float64Array.from({ length: N }, () => 0.04 + 0.01 * Math.random()),
+      s_NMDA: Float64Array.from({ length: N }, () => 0.04),
+      sm: 0,
+      psi: 0,
+      lost: null
+    }))
   };
 }
 
@@ -73,6 +64,8 @@ K.onUpdate(p => {
   }
 });
 
+c.addEventListener('click', () => { if (!sim.synced) newTrial(); });
+
 function fit() {
   const d = devicePixelRatio || 1; W_w = c.clientWidth; H_h = c.clientHeight;
   if (c.width !== Math.round(W_w * d) || c.height !== Math.round(H_h * d)) { c.width = W_w * d; c.height = H_h * d; }
@@ -84,7 +77,6 @@ function step(dt) {
   for (let stepIdx = 0; stepIdx < n; stepIdx++) {
     sim.t += h;
     sim.rings.forEach(R => {
-      // Calculate population vector for global inhibitory feedback
       let sum_r = 0, cc = 0, ss = 0;
       for (let j = 0; j < N; j++) {
         sum_r += R.r[j];
@@ -93,48 +85,41 @@ function step(dt) {
       }
       const mean_r = sum_r / N;
 
-      // 1. Update NMDA synaptic gating variables (s_NMDA) with slow kinetics (100 ms)
+      // 1. Slow NMDA gating update (100 ms time constant)
       for (let i = 0; i < N; i++) {
-        R.s_NMDA[i] += h * (-R.s_NMDA[i] / TAUNMDA + 0.5 * R.r[i] * (1 - R.s_NMDA[i]));
+        R.s_NMDA[i] += h * (-R.s_NMDA[i] / TAUNMDA + 0.6 * R.r[i] * (1 - R.s_NMDA[i]));
       }
 
-      // 2. Update Neural Firing Dynamics (Integration & Fire rate model)
+      // 2. Firing rate dynamics
       for (let i = 0; i < N; i++) {
-        // Recurrent excitatory input via structured NMDA footprint
         let I_rec_E = 0;
         for (let j = 0; j < N; j++) {
           I_rec_E += W[i][j] * R.s_NMDA[j];
         }
-        I_rec_E = (I_rec_E / N) * 2.8 * R.g_NMDA;
+        I_rec_E = (I_rec_E / N) * 3.4 * R.g_NMDA;
 
-        // Global feedback inhibition (GABA_A)
-        const I_rec_I = 1.1 * R.g_GABA * mean_r;
+        const I_rec_I = 1.35 * R.g_GABA * mean_r;
+        let I_ext = 0.22 + SIG * randn();
 
-        // External background input + noise
-        let I_ext = 0.25 + SIG * randn();
-
-        // Transient Spatial Visual Cue Input (presented for first 250 ms)
-        if (sim.t < 0.25) {
+        // Transient visual cue presentation (0 to 300 ms)
+        if (sim.t < 0.30) {
           let diff = Math.abs(TH[i] - sim.th0);
           if (diff > Math.PI) diff = 2 * Math.PI - diff;
-          I_ext += 0.8 * Math.exp(-(diff * diff) / (2 * 0.2 * 0.2));
+          I_ext += 1.2 * Math.exp(-(diff * diff) / (2 * 0.22 * 0.22));
         }
 
-        // Net input current
         const I_tot = I_ext + I_rec_E - I_rec_I;
-
-        // Rate update driven by leaky dynamics
         const target_rate = Math.min(1.0, Math.max(0.0, I_tot));
         R.r[i] += (h / TAUN) * (-R.r[i] + target_rate);
       }
 
-      // Calculate population vector magnitude and angle
+      // Vector strength / peak tracker
       const m1 = Math.hypot(cc, ss) / (N / 2);
       R.sm += (h / 0.1) * (m1 - R.sm);
       R.psi = Math.atan2(ss, cc);
 
-      // Track memory loss threshold
-      if (R.lost === null && sim.t > 0.5 && R.sm < 0.08) {
+      // Record time if memory collapses below threshold
+      if (R.lost === null && sim.t > 0.6 && R.sm < 0.07) {
         R.lost = sim.t;
       }
     });
@@ -143,36 +128,55 @@ function step(dt) {
 
 function draw() {
   g.clearRect(0, 0, W_w, H_h);
-  const rad = Math.max(20, Math.min(W_w / 4 - 22, H_h / 2 - 36)), cy = H_h / 2 + 12;
+  const rad = Math.max(16, Math.min(W_w / 6 - 18, H_h / 2 - 40)), cy = H_h / 2 + 14;
   const pos = (cx, a, rr) => [cx + rr * Math.sin(a), cy - rr * Math.cos(a)];
 
-  [['Unmedicated', col['--mute']], ['Medicated (+DA)', col['--mph']]].forEach(([name, color], k) => {
-    const R = sim.rings[k], cx = W_w * (0.25 + 0.5 * k);
-    g.strokeStyle = col['--line']; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, rad, 0, 7); g.stroke();
-    g.fillStyle = color;
+  sim.rings.forEach((R, k) => {
+    const color = col[R.colorKey] || col['--ink'];
+    const cx = W_w * (0.17 + 0.33 * k);
 
-    // Render Neurons along the Ring
+    // Ring Base
+    g.strokeStyle = col['--line']; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, rad, 0, 7); g.stroke();
+
+    // Visual Cue Indicator Marker
+    const [tx, ty] = pos(cx, sim.th0, rad * 1.22);
+    g.strokeStyle = col['--ink']; g.lineWidth = 2; g.beginPath(); g.moveTo(...pos(cx, sim.th0, rad * 1.08)); g.lineTo(tx, ty); g.stroke();
+
+    // Draw Continuous Firing Rate "Bump" Radar Outline
+    g.strokeStyle = color; g.lineWidth = 1.5; g.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const idx = i % N;
+      const r_ext = rad * (1 + 0.6 * R.r[idx]);
+      const [ptx, pty] = pos(cx, TH[idx], r_ext);
+      if (i === 0) g.moveTo(ptx, pty); else g.lineTo(ptx, pty);
+    }
+    g.stroke();
+
+    // Render Neurons as Pulsing Nodes
+    g.fillStyle = color;
     for (let i = 0; i < N; i++) {
       const [x, y] = pos(cx, TH[i], rad), f = R.r[i];
-      g.globalAlpha = 0.15 + 0.85 * f; g.beginPath(); g.arc(x, y, rad * (0.03 + 0.055 * f), 0, 7); g.fill();
+      g.globalAlpha = 0.2 + 0.8 * f; 
+      g.beginPath(); 
+      g.arc(x, y, rad * (0.035 + 0.06 * f), 0, 7); 
+      g.fill();
     }
     g.globalAlpha = 1;
 
-    // Draw Visual Cue Indicator
-    const [tx, ty] = pos(cx, sim.th0, rad * 1.2);
-    g.strokeStyle = col['--ink']; g.lineWidth = 2; g.beginPath(); g.moveTo(...pos(cx, sim.th0, rad * 1.1)); g.lineTo(tx, ty); g.stroke();
-
-    // Draw Remembered Vector (Bump Center & Strength)
+    // Vector Direction & Bump Magnitude Pointer
     if (R.sm > 0.05) {
-      const [ax, ay] = pos(cx, R.psi, rad * 0.85 * Math.min(1, R.sm / 0.4));
-      g.strokeStyle = color; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(ax, ay); g.stroke();
-      g.beginPath(); g.arc(ax, ay, 4, 0, 7); g.fill();
+      const [ax, ay] = pos(cx, R.psi, rad * 0.85 * Math.min(1, R.sm / 0.35));
+      g.strokeStyle = color; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(ax, ay); g.stroke();
+      g.beginPath(); g.arc(ax, ay, 3.5, 0, 7); g.fill();
     }
 
-    g.font = '11px ' + col['--sans']; g.textAlign = 'center'; g.fillStyle = color; g.beginPath(); g.arc(cx - 40, 14, 4.5, 0, 7); g.fill();
-    g.fillStyle = col['--mute']; g.textAlign = 'left'; g.fillText(name, cx - 32, 18);
-    g.textAlign = 'center'; g.fillText(R.lost === null ? 'holding (stable)' : 'memory lost at ' + R.lost.toFixed(1) + ' s', cx, 34);
+    // Title and Status Overlay
+    g.font = '11px ' + col['--sans']; g.textAlign = 'center'; g.fillStyle = color;
+    g.fillText(R.name, cx, 20);
+    g.fillStyle = col['--mute'];
+    g.fillText(R.lost === null ? 'holding (stable)' : 'lost at ' + R.lost.toFixed(1) + ' s', cx, 36);
   });
+
   g.fillStyle = col['--mute']; g.textAlign = 'right'; g.fillText(Math.min(sim.t, 30).toFixed(1) + ' s', W_w - 10, 18);
 }
 
