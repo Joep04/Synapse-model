@@ -49,22 +49,28 @@ The ring attractor model is a computational explanation of how the brain can kee
 
 For example, imagine a group of neurons in the brain, each of them is tuned to a different spatial location or direction. When you see something in a certain place, the neuron tuned to that location becomes particularly active. So neurons tuned to the location respond strongly, while neurons tuned to other locations respond less strongly. This produces a localized peak of activity, which is called an activity bump. 
 
-When the stimulus disappears your brain needs a mechanism to keep the activity bump alive, and remember the place. The ring attractor network achieves this through connections between neurons. This is explained using two types of connections:
-- Excitation: Neurons that prefer similar locations excite one another. 
-- Inhibition: Inhibitory connections prevent the whole network from firing too strongly. They help keep the activity selective, so the remembered location stands out from competing locations. 
-This balance allows the activity bump to remain active, representing the location in your working-memory. 
+When the stimulus disappears your brain needs a mechanism to keep the activity bump alive, and remember the place. The ring attractor network achieves this through connections between neurons. This is explained using two types of connections: \n
+- Excitation: Neurons that prefer similar locations excite one another. \n
+- Inhibition: Inhibitory connections prevent the whole network from firing too strongly. They help keep the activity selective, so the remembered location stands out from competing locations. \n
 
-The connectivity profile can be described by:
+The connectivity can be described by:
 $$
 W(\Delta\theta)
 = J^- + (J^+ - J^-)
 \exp\left(-\frac{\Delta\theta^2}{2\sigma^2}\right)
 $$
 
-Here, $\Delta\theta = \theta_i - \theta_j$ represents the difference between the preferred directions of two neurons. $J^+$ controls the strength of connections between similarly tuned neurons, $J^-$ represents the baseline connection strength, and $\sigma$ determines how broadly the excitation spreads across directions.
+Here, $\Delta\theta = \theta_i - \theta_j$ describes the difference between the preferred directions of two neurons. $J^+$ controls the strength of connections between neurons with similar preference, $J^-$ represents the baseline connection strength, and $\sigma$ determines how far the excitation spreads.
 
-Neurons tuned to similar locations excite one another, reinforcing the activity bump. Meanwhile, inhibition prevents the entire network from becoming excessively active.
+A key mechanism for holding the memory is the slow decay of (NMDA-mediated) recurrent excitation. The dynamics of the NMDA synaptic gating variable can be represented as:
+$$
+\frac{ds}{dt}
+= -\frac{s}{\tau_s}
 
+\alpha_s x(1-s)
+$$
+
+Here, $s$ represents the fraction of open NMDA channels, $\tau_s$ is the decay time constant, and $x$ represents the effect of incoming presynaptic spikes. The relatively slow NMDA dynamics allow recurrent excitation to continue a while after the stimulus disappears.
 `
     },
     {
