@@ -13,14 +13,14 @@ Second paragraph of the introduction (optional).
       text: `
 Dopamine is a neurotransmitter in the brain that plays a role in the reward center and many body functions including memory, movement, motivation, mood, attention, and more. 
 
-ADHD is an example of a neurodevelopmental disorder associated with dopamine dysregulation. The dopamine hypothesis of ADHD suggests that there is evidence for some involvement of reduced levels of DA neurotransmitters but it is not a defining feature. In our model a dopamine baseline is used, a low dopamine baseline is equal to the reduced signalling associated with ADHD.
+ADHD is an example of a neurodevelopmental disorder associated with dopamine dysregulation. The dopamine hypothesis of ADHD suggests ADHD is driven by some involvement of reduced levels of DA neurotransmitters, but it is not a defining feature. In our model a dopamine baseline is used, a low dopamine baseline is equal to the reduced signalling associated with ADHD.
 
 When neurotransmitters are released in the synapse, the process of reuptake occurs. Reuptake is the absorption of a neurotransmitter by a neurotransmitter transporter located along the plasma membrane of an axon terminal or glial cell. 
 
-Differences in dopamine reuptake contributes to altered dopamine signalling in people with ADHD. Specific genes result in higher levels of dopamine transporter channels within the brian. More dopamine channels means that dopamine will be removed more effectively from the synapse, meaning it has less chance of binding with receptors. 
+Differences in dopamine reuptake contributes to altered dopamine signalling in people with ADHD. Specific genes result in higher levels of dopamine transporter channels within the brain. More dopamine channels means that dopamine will be removed more effectively from the synapse, meaning it has less chance of binding with receptors. 
 
 Methylphenidate is a CNS stimulant approved for treatment of ADHD. It inhibits the reuptake of dopamine by blocking transporters. This leads to an increased availability of dopamine in the synaptic space. The inhibitors work by physically blocking the channel. 
-
+The methylphenidate in the model is shown with a red circle on the transporters, more methylphenidate means a less transparent circle, showing more transporters are blocked.
 `
     },
     {
