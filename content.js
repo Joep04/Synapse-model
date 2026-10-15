@@ -3,9 +3,11 @@
 
 const CONTENT = {
   intro: `
-Write a short introduction here: what the sliders mean and what the reader should look at.
+This page explains the four models of the site. You can interact using two sliders one for baseline dopamine and one for methylphenidate. A lower baseline is used to mimic ADHD.
 
-Second paragraph of the introduction (optional).
+Look at all the models to understand the full picture: Sliders change the dopamine balance in the synapse (model 1), the dopamine signal acts on D1 receptors which affect working-memory performance (model 2), the performance determines how well the activity bump in the ring attractor is held (model 3) and how deep the memory valley is (model 4).
+
+<i>This is a conceptual teaching model, not a clinical tool. Parameter values are simplified from the literature.</i>
 `,
   models: [
     {
@@ -13,13 +15,13 @@ Second paragraph of the introduction (optional).
       text: `
 Dopamine is a neurotransmitter in the brain that plays a role in the reward center and many body functions including memory, movement, motivation, mood, attention, and more. 
 
-ADHD is an example of a neurodevelopmental disorder associated with dopamine dysregulation. The dopamine hypothesis of ADHD suggests ADHD is driven by some involvement of reduced levels of DA neurotransmitters, but it is not a defining feature. In our model a dopamine baseline is used, a low dopamine baseline is equal to the reduced signalling associated with ADHD.
+<b>ADHD</b> is an example of a neurodevelopmental disorder associated with dopamine dysregulation. The dopamine hypothesis of ADHD suggests ADHD is driven by some involvement of reduced levels of DA neurotransmitters, but it is not a defining feature. In our model a dopamine baseline is used, a low dopamine baseline is equal to the reduced signalling associated with ADHD.
 
-When neurotransmitters are released in the synapse, the process of reuptake occurs. Reuptake is the absorption of a neurotransmitter by a neurotransmitter transporter located along the plasma membrane of an axon terminal or glial cell. 
+<b>Reuptake.</b> After release into the synapse, dopamine is reabsorbed by dopamine transporters (DAT) located along the plasma membrane of an axon terminal or glial cell. 
 
 Differences in dopamine reuptake contributes to altered dopamine signalling in people with ADHD. Specific genes result in higher levels of dopamine transporter channels within the brain. More dopamine channels means that dopamine will be removed more effectively from the synapse, meaning it has less chance of binding with receptors. 
 
-Methylphenidate is a CNS stimulant approved for treatment of ADHD. It inhibits the reuptake of dopamine by blocking transporters. This leads to an increased availability of dopamine in the synaptic space. The inhibitors work by physically blocking the channel. 
+<b>Methylphenidate (MPH)</b>  is a CNS stimulant approved for treatment of ADHD. It inhibits the reuptake of dopamine by blocking transporters. This leads to an increased availability of dopamine in the synaptic space. The inhibitors work by physically blocking the channel. 
 The methylphenidate in the model is shown with a red circle on the transporters, more methylphenidate means a less transparent circle, showing more transporters are blocked.
 `
     },
