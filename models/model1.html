@@ -104,7 +104,9 @@ function loop(now) {
   if (W && col['--da']) {
     const preY = H * 0.3, postY = H * 0.74, s = K.compute(P.da, P.mph, P.profile), b = s.occupancy;
     rate = RELEASE_SCALE * s.start / K.PAPER.DA_MAX;   // release events per second follow the (profile-adjusted) dopamine level
-    step(dt, preY, postY, b); draw(preY, postY, b);
+    const total = dt * (P.speed || 1), n = Math.max(1, Math.ceil(total / 0.02));   // speed button: several small steps per frame
+    for (let i = 0; i < n; i++) step(total / n, preY, postY, b);
+    draw(preY, postY, b);
   }
   requestAnimationFrame(loop);
 }
