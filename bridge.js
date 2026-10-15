@@ -1,37 +1,38 @@
 // Shared core, loaded by index.html and by every model file.
-// Model files only need:  PKPD.onUpdate(p => { ...draw using p.da, p.mph... });
 const PKPD = (() => {
-  const consts = { Vmax: 100, Km: 200, Ki: 100, ngToNM: 4.28, Kd: 500 }; // nM/s, nM, nM, nM per ng/mL, nM
-  const params = { da: 1, mph: 3, profile: 'adhd', shared: {} };   // da = baseline dopamine (0-4), mph = ng/mL      // da = release rate (nM/s), mph = plasma conc (ng/mL)
+  const consts = { Vmax: 100, Km: 200, Ki: 100, ngToNM: 4.28, Kd: 500 }; 
+  const params = { da: 60, mph: 10, profile: 'adhd', shared: {} };   // da = baseline dopamine (%, adhd=60%), mph = mg (standaard 10mg)
   const subs = [];
+  
   const kApp = mph => consts.Km * (1 + (mph * consts.ngToNM) / consts.Ki);
   const uptake = (C, mph) => consts.Vmax * C / (kApp(mph) + C);
   const steadyState = (R, mph) => R >= consts.Vmax ? Infinity : R * kApp(mph) / (consts.Vmax - R);
-  // ---- Paper-based model (values from the original model 2) ----
-  const PAPER = { DA_MAX: 4.0, OPTIMUM: 2.0, CURVE_WIDTH: 0.64, BOOST: 0.0, MPH: { ec50: 4.5, eMax: 1.0, maxInc: 2.5 } };
-  // start = baseline dopamine and mph = methylphenidate (ng/mL) the profile sets on the sliders
-  // (start = 2.0 + the profile's shift in the original model 2: ADHD -1.0, Anxiety +0.2 stress +0.6 surge).
-  // wm = curve width factor (tolerance).
+  
+  // Geschaald naar percentages: max 200%, optimum 100%
+  const PAPER = { DA_MAX: 200.0, OPTIMUM: 100.0, CURVE_WIDTH: 32.0, BOOST: 0.0, MPH: { ec50: 15.0, eMax: 1.0, maxInc: 100.0 } };
+  
   const PROFILES = {
-    typical: { name: 'Typical',           start: 2.0, mph: 0, wm: 1.0 },
-    adhd:    { name: 'ADHD',              start: 1.0, mph: 3, wm: 1.0 },
-    anxiety: { name: 'Anxiety or stress', start: 2.8, mph: 0, wm: 1.0 }
+    typical: { name: 'Typical',           start: 100.0, mph: 0,  wm: 1.0 },
+    adhd:    { name: 'ADHD',              start: 60.0,  mph: 10, wm: 1.0 },
+    anxiety: { name: 'Anxiety or stress', start: 140.0, mph: 0,  wm: 1.0 }
   };
+  
   const clamp = (v, a, c) => Math.min(c, Math.max(a, v));
   const performance = (da, w) => 100 * Math.exp(-Math.pow(da - PAPER.OPTIMUM, 2) / (2 * w * w));
   const occupancy = conc => PAPER.MPH.eMax * conc / (PAPER.MPH.ec50 + conc);
-  function compute(baseline, conc, profile) {   // start = unmedicated level, after = level on MPH
+  
+  function compute(baseline, conc, profile) {   
     const p = PROFILES[profile] || PROFILES.typical, occ = occupancy(conc), width = PAPER.CURVE_WIDTH * p.wm;
     const start = clamp(baseline, 0, PAPER.DA_MAX);
     const after = clamp(start + PAPER.MPH.maxInc * occ + PAPER.BOOST, 0, PAPER.DA_MAX);
     return { start, after, width, occupancy: occ, p0: performance(start, width), p1: performance(after, width) };
   }
+  
   const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const emit = () => subs.forEach(f => f({ ...params }));
   const onUpdate = f => { subs.push(f); };
-  // Publish values to the other models (via index.html), e.g. PKPD.share({ perfMedicated: 0.8 }).
-  // Other models read them as p.shared.<name> inside onUpdate.
+  
   let lastShared = '';
   const share = values => {
     const j = JSON.stringify(values); if (j === lastShared) return; lastShared = j;
@@ -67,7 +68,6 @@ const PKPD = (() => {
     }
   }
 
-  // Inside a model iframe: receive slider values + theme from index.html
   if (!window.PKPD_HOST) {
     const set = t => Object.entries(t).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
     const dark = matchMedia('(prefers-color-scheme: dark)').matches;
@@ -85,6 +85,4 @@ const PKPD = (() => {
     addEventListener('load', emit);
   }
   return { consts, params, kApp, uptake, steadyState, linspace, plot, css, onUpdate, share, PAPER, PROFILES, performance, occupancy, compute };
-})();
-
-
+})(); 
