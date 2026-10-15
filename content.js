@@ -49,9 +49,9 @@ Brain dopamine has long been implicated in cognitive control processes, includin
 
 There are five main types of dopamine receptors. In our model we primarily focus on D1, because evidence supports an inverted-U relationship with D1 receptor stimulation and working-memory performance. D2 receptor activation also influences working-memory-related neural activity, but the relationship is less well established. 
 
-D1 receptors are involved in memory, attention, impulse control, regulation of renal function, and locomotion. They are primarily located in the striatum and the cerebral cortex. In the prefrontal cortex, D1 receptor stimulation is generally associated with reduced neuronal firing. \n
+D1 receptors are involved in memory, attention, impulse control, regulation of renal function, and locomotion. They are primarily located in the striatum and the cerebral cortex. D1 stimulation does not simply make prefrontal cortex (PFC) neurons fire more or less. It changes how selectively they respond to information.  \n
 1. Excessive stimulation: Suppression becomes too strong. The activity representing the preferred location decreases, so the neuron loses useful information and spatial tuning deteriorates. \n
-2. Moderate stimulation: Activity for non-preffered locations is reduced more than activity for the preferred location. The relevant information stands out more clearly, potentially improving working memory. \n
+2. Moderate stimulation: Activity for non-preffered locations is reduced more than activity for the preferred location. The relevant information stands out more clearly. \n
 3. Too little stimulation: Neuronal activity can be noisy, so the preferred location is not represented clearly. \n
 
 Psychopharmacological studies with human volunteers indicate that the effect of dopaminergic drug administration depends on baseline level of performance. It improved cognition in subjects with lower baseline working-memory, and worsening cognition in those with higher baseline working memory capacity. \n
@@ -59,6 +59,22 @@ Psychopharmacological studies with human volunteers indicate that the effect of 
 2. Near peak baseline: There is moderate stimulation and the working-memory performance is already in the optimal zone. A dose gives little benefit. \n
 3. High baseline: A dose pushes the individual past the peak. Resulting in excessive stimulation of the D1 receptor, and thus worsening working-memory performance. \n
 
+This model stimulates the pharmacokinetics and pharmacodynamics of MPH and its impact on the PFC. It bridges four core steps: \n
+1. The administered dose (in milligrams or mg/kg). \n
+2. Transporter occupancy (DAT/NET occupancy in %). \n
+3. The surge in extracellular dopamine (via reuptake inhibition). \n
+4. Cognitive performance via the classic Inverted-U curve (where both too little and too much dopamine lead to poorer performance). \n
+
+How are medications and doses formulated? This is handled in two mathematical steps: \n
+A) From dose (mg) to transporter occupancy (Hill equation): Receptor saturation is typically described using the hill equation. This ensure the curve rises steeply at first, but flattens out at higher doses approaching a maximum (Emax): \n
+- ED50:Tied to body weight (0.25mg x weighting, which amounts to 17.5mg for a standard 70kg adult). \n
+- Emax: Set to 90% (the maximum achievable range of transporter blockade). \n
+- n (Hill coefficient): Set to 1.35 to match curve steepness precisely with clinical data points (such as ~12% at 5mg and ~73% at 40mg). \n
+B) From occupancy to dopamine increase (Inverse-linear mechanism) \n
+- If a fraction O (e.g., 0.70 or 70%) of the transporters is occupied, an unoccupied fraction of 1-O remains to clear dopamine. \n
+- Clearance capacity drops inversely with occupancy. The multiplication factor for extracellular dopamine becomes 1/1-O. \n
+- Converted to a percentage increase relative to baseline (0% change): \n
+C) The inverted-U performance output: The calculated dopamine level is subsequently fed into a Gaussian-like performance function in the model.
 `
     },
     {
