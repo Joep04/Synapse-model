@@ -24,7 +24,7 @@ Methylphenidate is a CNS stimulant approved for treatment of ADHD. It inhibits t
 `
     },
     {
-      title: "Working memory and the inverted U",
+      title: "2. Working memory and the inverted U",
       text: `
 Brain dopamine has long been implicated in cognitive control processes, including working-memory. The relationship of dopamine and working memory can be described as an inverted U-shaped curve. 
 
