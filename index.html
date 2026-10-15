@@ -84,15 +84,13 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
 </head>
 <body>
 <aside>
-  <h1>Dopamine & methylphenidate influence on working memory<span>Change the sliders to see what happens to the four models.  <br>
-    To get more info on what the models mean, click the "i" symbol in the topright of the model or look at the "About the models" tab.</span></h1>
+  <h1>Dopamine & methylphenidate influence on working memory<span>Change the sliders to see what happens to the models.</span></h1>
   <div><div class="cap">Profile (avg values)</div><div class="profile" id="profile"></div></div>
   <div class="ctl"><label for="da">Baseline dopamine <output id="daOut"></output></label>
-    <input id="da" type="range" min="0" max="4" step="0.1" value="1"></div>
+    <input id="da" type="range" min="0" max="200" step="1" value="60"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
-    <input id="mph" type="range" min="0" max="40" step="0.5" value="3"></div>
+    <input id="mph" type="range" min="0" max="60" step="1" value="10"></div>
   <div><div class="cap">Simulation speed</div><button class="speed" id="speed" title="Speeds up the valley and ring models">Speed &times;1</button></div>
-  </div>
 </aside>
 
 <div class="content">
@@ -108,15 +106,14 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
 <script>window.PKPD_HOST = true;</script>
 <script src="bridge.js"></script>
 <script>
-/* ---- Model list: file, card title/caption, and height. The models themselves live in models/*.html ---- */
 const MODELS = [
-  { file: 'models/model1.html', title: '1. Synapse',                          caption: 'Dopamine is released from vesicles into the cleft; transporters take it back up (reuptake) and refill the vesicles. Purple = blocked.', height: 340 },
-  { file: 'models/model2.html', title: '2. Performance (inverted U)', caption: 'Dopamine and methylphenidate set working memory performance on an inverted U. The effects of this can be seen in models 3 and 4.', height: 270 },
-  { file: 'models/model4.html', title: '3. Ring attractor', caption: 'Neurons on a ring hold the memory as a bump of neuron firing. Recurrent excitation decays like the valley in model 4; the bump fades and the memory is lost.', height: 270 },
-  { file: 'models/model3.html', title: '4. Valley model', caption: 'Working memory can be seen like a ball in a valley: The valley decays, when the ball rolls out, the memory is lost. Click to restart.', height: 270 }
+  { file: 'models/model1.html', title: '1. Synapse', caption: 'Dopamine is released from vesicles into the cleft; transporters take it back up (reuptake) and refill the vesicles. Purple = blocked.', height: 340 },
+  { file: 'models/model2.html', title: '2. Performance (inverted U)', caption: 'Dopamine and methylphenidate set working memory performance on an inverted U.', height: 270 },
+  { file: 'models/model4.html', title: '3. Ring attractor', caption: 'Neurons on a ring hold the memory as a bump of neuron firing.', height: 270 },
+  { file: 'models/model3.html', title: '4. Valley model', caption: 'Working memory can be seen like a ball in a valley.', height: 270 }
 ];
 
-const K = PKPD, params = { da: 1, mph: 3, profile: 'adhd', speed: 1 };
+const K = PKPD, params = { da: 60, mph: 10, profile: 'adhd', speed: 1 };
 const THEME = ['--panel','--ink','--mute','--line','--da','--mph','--curve','--sans'];
 const frames = [], shared = {};
 
@@ -132,13 +129,6 @@ addEventListener('message', e => {
   if (JSON.stringify(shared) !== before) sendAll();
 });
 
-function readouts() {   // sidebar readout is optional: does nothing if the elements were removed
-  const r = K.compute(params.da, params.mph, params.profile);
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
-  set('perfOut', `${Math.round(r.p1)}<small>%</small>`);
-  set('perf0Out', `${Math.round(r.p0)}%`);
-  set('occOut', `${Math.round(r.occupancy * 100)}%`);
-}
 const paragraphs = t => t.trim().split(/\n\s*\n/).map(p => `<p>${p.trim()}</p>`).join('');
 
 const main = document.getElementById('models'), cards = [], btns = [];
@@ -150,7 +140,6 @@ MODELS.forEach(m => {
   f.addEventListener('load', () => send(f));
 });
 
-// Info popup: shows this model's text from content.js, over the other column so the model itself stays visible
 const popup = document.createElement('div'); popup.id = 'popup'; popup.hidden = true; popup.setAttribute('role', 'dialog');
 main.appendChild(popup);
 let openIdx = -1;
@@ -171,7 +160,6 @@ function openInfo(i) {
 btns.forEach((b, i) => b.addEventListener('click', () => openInfo(i)));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo(); });
 
-
 document.getElementById('about').innerHTML =
   paragraphs(CONTENT.intro) + CONTENT.models.map(x => `<h2>${x.title}</h2>${paragraphs(x.text)}`).join('');
 
@@ -182,12 +170,12 @@ tabs.forEach(([btn, panel]) => document.getElementById(btn).addEventListener('cl
   sendAll();
 }));
 
-[['da', 'units', 'daOut', 2], ['mph', 'ng/mL', 'mphOut', 1]].forEach(([id, unit, out, dec]) => {
+[['da', '%', 'daOut', 0], ['mph', 'mg', 'mphOut', 0]].forEach(([id, unit, out, dec]) => {
   const el = document.getElementById(id), o = document.getElementById(out);
-  const upd = () => { params[id] = +el.value; o.innerHTML = `${(+el.value).toFixed(dec)}<small>${unit}</small>`; readouts(); sendAll(); };
+  const upd = () => { params[id] = +el.value; o.innerHTML = `${(+el.value).toFixed(dec)}<small>${unit}</small>`; sendAll(); };
   el.addEventListener('input', upd); upd();
 });
-// Profile tabs (Typical / ADHD / Anxiety, from the paper-based model)
+
 const profileBox = document.getElementById('profile');
 Object.entries(K.PROFILES).forEach(([key, p]) => {
   const b = document.createElement('button'); b.textContent = p.name; b.dataset.key = key;
@@ -195,7 +183,7 @@ Object.entries(K.PROFILES).forEach(([key, p]) => {
   b.addEventListener('click', () => applyProfile(key));
   profileBox.appendChild(b);
 });
-// A profile moves both sliders to its starting values; you can still adjust them afterwards.
+
 function applyProfile(key) {
   params.profile = key;
   profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.key === key));
@@ -205,15 +193,14 @@ function applyProfile(key) {
   });
 }
 applyProfile(params.profile);
-// Deselect the profile when the user moves a slider.
-// e.isTrusted is false for the events applyProfile() fires itself, so choosing a tab doesn't deselect it.
+
 ['da', 'mph'].forEach(id => document.getElementById(id).addEventListener('input', e => {
   if (!e.isTrusted || params.profile === null) return;
   params.profile = null;
   profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false'));
-  readouts(); sendAll();
+  sendAll();
 }));
-// Speed-up button: cycles the speed of the memory models (valley + ring)
+
 const SPEEDS = [1, 2, 5, 10], speedBtn = document.getElementById('speed');
 speedBtn.addEventListener('click', () => {
   params.speed = SPEEDS[(SPEEDS.indexOf(params.speed) + 1) % SPEEDS.length];
@@ -226,4 +213,3 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setT
 </script>
 </body>
 </html>
-
