@@ -23,6 +23,23 @@ Differences in dopamine reuptake contributes to altered dopamine signalling in p
 
 <b>Methylphenidate (MPH)</b>  is a CNS stimulant approved for treatment of ADHD. It inhibits the reuptake of dopamine by blocking transporters. This leads to an increased availability of dopamine in the synaptic space. The inhibitors work by physically blocking the channel. 
 The methylphenidate in the model is shown with a red circle on the transporters, more methylphenidate means a less transparent circle, showing more transporters are blocked.
+
+<b>Important formulas and values for the model</b>
+ 
+Part of transporters blocked (dose in mg, Hill curve):
+$$
+\text{Occ}(d) = \frac{E_{max}\,d^{\,n}}{ED_{50}^{\,n} + d^{\,n}}
+$$
+ 
+Dopamine clearance rate (Michaelis–Menten uptake):
+$$
+\frac{d[DA]}{dt} = \text{release} - \frac{V_{max}\,[DA]}{K_m + [DA]}\,\bigl(1 - \text{Occ}\bigr)
+$$
+ 
+Simplified steady state used in the sliders (100% = typical):
+$$
+DA_{eff} = \frac{B}{1 - f\cdot \text{Occ}}
+$$
 `
     },
     {
