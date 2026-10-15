@@ -48,17 +48,22 @@ Psychopharmacological studies with human volunteers indicate that the effect of 
 The ring attractor model is a computational explanation of how the brain can keep information in working-memory even after the original stimulus has disappeared. The circle is a mathematical representation, the neurons are not necessarily physically arranged in a ring in the brain. 
 
 For example, imagine a group of neurons in the brain, each of them is tuned to a different spatial location or direction. When you see something in a certain place, the neuron tuned to that location becomes particularly active. So neurons tuned to the location respond strongly, while neurons tuned to other locations respond less strongly. This produces a localized peak of activity, which is called an activity bump. 
-The local bump can be explained using the formula for connection weight between neurons: 
-W(Δθ) = J⁻ + (J⁺ - J⁻) · exp( -Δθ² / (2 · σ_EE²) )
-
-  • J⁺ = 1.62 (strong local iso-directional excitation)
-  • J⁻ = weak baseline cross-directional weight
-  • σ_EE = 18° (footprint spatial tuning width)
 
 When the stimulus disappears your brain needs a mechanism to keep the activity bump alive, and remember the place. The ring attractor network achieves this through connections between neurons. This is explained using two types of connections:
 - Excitation: Neurons that prefer similar locations excite one another. 
 - Inhibition: Inhibitory connections prevent the whole network from firing too strongly. They help keep the activity selective, so the remembered location stands out from competing locations. 
 This balance allows the activity bump to remain active, representing the location in your working-memory. 
+
+The connectivity profile can be described by:
+$$
+W(\Delta\theta)
+= J^- + (J^+ - J^-)
+\exp\left(-\frac{\Delta\theta^2}{2\sigma^2}\right)
+$$
+
+Here, $\Delta\theta = \theta_i - \theta_j$ represents the difference between the preferred directions of two neurons. $J^+$ controls the strength of connections between similarly tuned neurons, $J^-$ represents the baseline connection strength, and $\sigma$ determines how broadly the excitation spreads across directions.
+
+Neurons tuned to similar locations excite one another, reinforcing the activity bump. Meanwhile, inhibition prevents the entire network from becoming excessively active.
 
 `
     },
