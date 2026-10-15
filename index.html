@@ -37,7 +37,7 @@ input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--c);border:3px solid var(--side);box-shadow:0 0 0 2px var(--c);cursor:grab}
 input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--c);border:3px solid var(--side);box-shadow:0 0 0 2px var(--c);cursor:grab}
 input[type=range]:focus-visible{outline:2px solid var(--c);outline-offset:8px}
-#da{--c:var(--side-da)} #mph{--c:var(--side-mph)} #sens{--c:#f2b36b}
+#da{--c:var(--side-da)} #mph{--c:var(--side-mph)}
 .readout{margin-top:auto;padding-top:22px;border-top:1px solid rgba(255,255,255,.15)}
 .readout .lbl{color:var(--side-mute);font-size:.85rem}
 .readout .big{font:600 3rem/1.1 var(--serif);font-variant-numeric:tabular-nums}
@@ -88,11 +88,9 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
     To get more info on what the models mean, click the "i" symbol in the topright of the model or look at the "About the models" tab.</span></h1>
   <div><div class="cap">Profile (avg values)</div><div class="profile" id="profile"></div></div>
   <div class="ctl"><label for="da">Baseline dopamine <output id="daOut"></output></label>
-    <input id="da" type="range" min="0" max="200" step="1" value="100"></div>
-  <div class="ctl"><label for="sens">Receptor sensitivity <output id="sensOut"></output></label>
-    <input id="sens" type="range" min="0" max="200" step="1" value="100"></div>
+    <input id="da" type="range" min="0" max="4" step="0.1" value="1"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
-    <input id="mph" type="range" min="0" max="60" step="1" value="20"></div>
+    <input id="mph" type="range" min="0" max="40" step="0.5" value="3"></div>
   <div><div class="cap">Simulation speed</div><button class="speed" id="speed" title="Speeds up the valley and ring models">Speed &times;1</button></div>
   </div>
 </aside>
@@ -118,16 +116,14 @@ const MODELS = [
   { file: 'models/model3.html', title: '4. Valley model', caption: 'Working memory can be seen like a ball in a valley: The valley decays, when the ball rolls out, the memory is lost. Click to restart.', height: 270 }
 ];
 
-const K = PKPD, params = { daPct: 100, mg: 20, sens: 100, profile: 'adhd', speed: 1 };
+const K = PKPD, params = { da: 1, mph: 3, profile: 'adhd', speed: 1 };
 const THEME = ['--panel','--ink','--mute','--line','--da','--mph','--curve','--sans'];
 const frames = [], shared = {};
 
 function send(f) {
   const cs = getComputedStyle(document.documentElement), theme = {};
   THEME.forEach(n => theme[n] = cs.getPropertyValue(n).trim());
-  // legacy units (da 0-4, mph ng/mL) are kept for model 1; model 2 uses daPct, mg and sens
-  const payload = { ...params, da: params.daPct / 50, mph: K.legacyConc(params.mg), shared };
-  f.contentWindow.postMessage({ type: 'pkpd', params: payload, theme }, '*');
+  f.contentWindow.postMessage({ type: 'pkpd', params: { ...params, shared }, theme }, '*');
 }
 const sendAll = () => frames.forEach(send);
 addEventListener('message', e => {
@@ -137,7 +133,7 @@ addEventListener('message', e => {
 });
 
 function readouts() {   // sidebar readout is optional: does nothing if the elements were removed
-  const r = K.compute(params.daPct, params.mg, params.sens, params.profile);
+  const r = K.compute(params.da, params.mph, params.profile);
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
   set('perfOut', `${Math.round(r.p1)}<small>%</small>`);
   set('perf0Out', `${Math.round(r.p0)}%`);
@@ -186,9 +182,9 @@ tabs.forEach(([btn, panel]) => document.getElementById(btn).addEventListener('cl
   sendAll();
 }));
 
-[['da', 'daPct', '%', 'daOut', 0], ['mph', 'mg', 'mg', 'mphOut', 0], ['sens', 'sens', '%', 'sensOut', 0]].forEach(([id, key, unit, out, dec]) => {
+[['da', 'units', 'daOut', 2], ['mph', 'ng/mL', 'mphOut', 1]].forEach(([id, unit, out, dec]) => {
   const el = document.getElementById(id), o = document.getElementById(out);
-  const upd = () => { params[key] = +el.value; o.innerHTML = `${(+el.value).toFixed(dec)}<small>${unit}</small>`; readouts(); sendAll(); };
+  const upd = () => { params[id] = +el.value; o.innerHTML = `${(+el.value).toFixed(dec)}<small>${unit}</small>`; readouts(); sendAll(); };
   el.addEventListener('input', upd); upd();
 });
 // Profile tabs (Typical / ADHD / Anxiety, from the paper-based model)
@@ -203,7 +199,7 @@ Object.entries(K.PROFILES).forEach(([key, p]) => {
 function applyProfile(key) {
   params.profile = key;
   profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.key === key));
-  [['da', 'start'], ['mph', 'mph'], ['sens', 'sens']].forEach(([id, field]) => {
+  [['da', 'start'], ['mph', 'mph']].forEach(([id, field]) => {
     const el = document.getElementById(id); el.value = K.PROFILES[key][field];
     el.dispatchEvent(new Event('input'));
   });
@@ -211,7 +207,7 @@ function applyProfile(key) {
 applyProfile(params.profile);
 // Deselect the profile when the user moves a slider.
 // e.isTrusted is false for the events applyProfile() fires itself, so choosing a tab doesn't deselect it.
-['da', 'mph', 'sens'].forEach(id => document.getElementById(id).addEventListener('input', e => {
+['da', 'mph'].forEach(id => document.getElementById(id).addEventListener('input', e => {
   if (!e.isTrusted || params.profile === null) return;
   params.profile = null;
   profileBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false'));
@@ -230,3 +226,4 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setT
 </script>
 </body>
 </html>
+
