@@ -13,33 +13,44 @@ canvas{position:absolute;inset:0}
 </div>
 <script>
 /**
- * Berekent de dopamine-toename in percentage op basis van de gegeven methylfenidate (mg) dosering.
- * Maakt gebruik van de Hill-vergelijking voor transporterbezetting en de inverse open-fractie voor dopamine-accumulatie.
+ * Calculates transporter occupancy and the resulting extracellular dopamine increase 
+ * based on a given oral dose of methylphenidate (MPH) and body weight.
+ * 
+ * @param {number} doseMg - The dose of MPH in milligrams (mg)
+ * @param {number} weightKg - Patient body weight in kilograms (default = 70 kg)
+ * @returns {Object} An object containing the occupancy percentage and dopamine increase percentage
  */
 function calculateDopamineIncrease(doseMg, weightKg = 70) {
-    const ed50Mg = 0.25 * weightKg; // ED50 gebaseerd op lichaamsgewicht (PET-data)
-    const eMax = 0.90;             // Maximale transporterblokkade (90%)
-    const n = 1.35;                // Hill-coëfficiënt
+    // 1. Calculate ED50 in mg based on body weight (0.25 mg/kg from PET data)
+    const ed50Mg = 0.25 * weightKg; 
+    const eMax = 0.90; // Maximum possible transporter blockade (90%)
+    const n = 1.35;    // Hill coefficient for curve steepness
 
     if (doseMg <= 0) {
         return { occupancy: 0, daIncrease: 0 };
     }
 
+    // Step A: Calculate the fraction of occupied transporters (O between 0 and 1) using the Hill equation
     const dosePow = Math.pow(doseMg, n);
     const ed50Pow = Math.pow(ed50Mg, n);
     const occupancyFraction = (eMax * dosePow) / (ed50Pow + dosePow);
 
-    // Reuptake clearance is omgekeerd evenredig met de onbezette fractie (1 - occupancyFraction)
+    // Step B: Calculate dopamine increase based on the open (unoccupied) fraction
+    // Reuptake clearance is inversely proportional to the unoccupied fraction (1 - occupancyFraction)
     const dopamineMultiplier = 1 / (1 - occupancyFraction);
+    
+    // Convert to percentage increase relative to baseline (0% = no change)
     const percentageIncrease = (dopamineMultiplier - 1) * 100;
 
     return {
-        occupancy: occupancyFraction * 100,
-        daIncrease: percentageIncrease // Extra dopamine in % bovenop de baseline
+        occupancy: occupancyFraction * 100, // Transporter occupancy in %
+        daIncrease: percentageIncrease       // Dopamine increase relative to baseline in %
     };
 }
 
 const K = PKPD;
+// Driven by the sidebar: p.da = baseline dopamine, p.mph = methylphenidate (ng/mL), p.profile = Typical / ADHD / Anxiety.
+// The paper-based values (profiles, MPH curve, optimum) live in bridge.js (PKPD.PAPER, PKPD.PROFILES, PKPD.compute).
 let P = K.params;
 
 function draw(cv, o) {
@@ -62,23 +73,26 @@ function draw(cv, o) {
   g.beginPath(); g.moveTo(X(o.x[0]), Y(0));
   o.x.forEach((x, i) => g.lineTo(X(x), Y(o.y[i]))); g.lineTo(X(o.x[o.x.length - 1]), Y(0)); g.closePath();
   g.globalAlpha = .09; g.fillStyle = C('--da'); g.fill(); g.globalAlpha = 1;
-  
+
+  // Set dash pattern [5, 4] and default grey stroke style
   g.setLineDash([5, 4]); g.strokeStyle = C('--mute'); g.lineWidth = 1.2;
-  
+
+  // Unmedicated horizontal line (grey dashed)
   if (o.hline != null) { 
     g.beginPath(); g.moveTo(m.l, Y(o.hline)); g.lineTo(W - m.r, Y(o.hline)); g.stroke(); 
   }
-  
+
+  // Medicated horizontal line (purple dashed)
   if (o.hline2 != null) {
     g.save();
     if (o.hline2Color) g.strokeStyle = o.hline2Color;
     g.beginPath(); g.moveTo(m.l, Y(o.hline2)); g.lineTo(W - m.r, Y(o.hline2)); g.stroke();
     g.restore();
   }
-  
+
   if (o.vline != null) { g.beginPath(); g.moveTo(X(o.vline), m.t); g.lineTo(X(o.vline), m.t + ph); g.stroke(); }
   if (o.link) { g.beginPath(); g.moveTo(X(o.link[0].x), Y(o.link[0].y)); g.lineTo(X(o.link[1].x), Y(o.link[1].y)); g.stroke(); }
-  
+
   g.setLineDash([]);
   g.strokeStyle = C('--curve'); g.lineWidth = 2.5; g.lineJoin = 'round'; g.beginPath();
   o.x.forEach((x, i) => i ? g.lineTo(X(x), Y(o.y[i])) : g.moveTo(X(x), Y(o.y[i]))); g.stroke();
@@ -96,41 +110,21 @@ function draw(cv, o) {
 }
 
 function update() {
-  const baseline = P.da, dose = P.mph; // P.mph is nu de dosering in mg (0 - 60)
-  
-  const daResult = calculateDopamineIncrease(dose);
-  const medicatedDa = Math.min(200, baseline * (1 + daResult.daIncrease / 100));
-  
-  const width = 32.0; 
-  const p0 = 100 * Math.exp(-Math.pow(baseline - 100, 2) / (2 * width * width));
-  const p1 = 100 * Math.exp(-Math.pow(medicatedDa - 100, 2) / (2 * width * width));
-  
-  const name = (K.PROFILES[P.profile] || { name: 'Custom' }).name;
-  const grey = K.css('--mute'), violet = K.css('--mph');
-  
-  // Grafiek 1: Inverted U-curve (X-as max 200%, optimum op 100%)
-  const xs = K.linspace(0, 200, 200);
+  const baseline = P.da, conc = P.mph, s = K.compute(baseline, conc, P.profile), name = (K.PROFILES[P.profile] || { name: 'Custom' }).name;
+  const grey = K.css('--mute'), violet = K.css('--mph'), xs = K.linspace(0, K.PAPER.DA_MAX, 200);
   draw(document.getElementById('c1'), {
-    x: xs, y: xs.map(x => 100 * Math.exp(-Math.pow(x - 100, 2) / (2 * width * width))), xmax: 200, xstep: 50, 
-    title: 'Inverted U', xlabel: 'Dopamine (% of baseline)',
-    hline: p0, hline2: p1, hline2Color: violet, link: [{ x: baseline, y: p0 }, { x: medicatedDa, y: p1 }],
-    markers: [{ x: baseline, y: p0, color: grey }, { x: medicatedDa, y: p1, color: violet }],
-    legend: [{ label: 'Unmedicated  ' + Math.round(p0) + '%', color: grey }, { label: 'Medicated  ' + Math.round(p1) + '%', color: violet }]
+    x: xs, y: xs.map(x => K.performance(x, s.width)), xmax: K.PAPER.DA_MAX, xstep: 1, title: 'Inverted U', xlabel: 'Dopamine (relative units)',
+    hline: s.p0, hline2: s.p1, hline2Color: violet, link: [{ x: s.start, y: s.p0 }, { x: s.after, y: s.p1 }],
+    markers: [{ x: s.start, y: s.p0, color: grey }, { x: s.after, y: s.p1, color: violet }],
+    legend: [{ label: 'Unmedicated  ' + Math.round(s.p0) + '%', color: grey }, { label: 'Medicated  ' + Math.round(s.p1) + '%', color: violet }]
   });
-
-  // Grafiek 2: Dose-response over de MPH slider (0 tot 60 mg)
-  const cs = K.linspace(0, 60, 200);
+  const cs = K.linspace(0, 40, 200);
   draw(document.getElementById('c2'), {
-    x: cs, y: cs.map(c => {
-      const simDa = calculateDopamineIncrease(c);
-      const totalDa = Math.min(200, baseline * (1 + simDa.daIncrease / 100));
-      return 100 * Math.exp(-Math.pow(totalDa - 100, 2) / (2 * width * width));
-    }), 
-    xmax: 60, xstep: 10, title: 'Dose-response: ' + name, xlabel: 'Methylphenidate (mg)',
-    hline: p0, vline: dose, markers: [{ x: dose, y: p1, color: violet }]
+    x: cs, y: cs.map(c => K.compute(baseline, c, P.profile).p1), xmax: 40, xstep: 10, title: 'Dose-response: ' + name, xlabel: 'Methylphenidate (ng/mL)',
+    hline: s.p0, vline: conc, markers: [{ x: conc, y: s.p1, color: violet }]
   });
-
-  K.share({ perfUnmedicated: Math.round(p0) / 100, perfMedicated: Math.round(p1) / 100 });
+  // Output to models 3 and 4 (0-1)
+  K.share({ perfUnmedicated: Math.round(s.p0) / 100, perfMedicated: Math.round(s.p1) / 100 });
 }
 
 K.onUpdate(p => { P = p; update(); });
