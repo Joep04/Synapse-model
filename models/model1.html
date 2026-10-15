@@ -3,9 +3,15 @@
 <body><canvas id="c"></canvas>
 <script>
 const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
-let P = K.params, rate = 10, W = 0, H = 0, orbs = [], last = performance.now(), acc = 0;
-const NR = 6, NT = 5, busy = Array(NR).fill(false);
-const col = {};
+const NR = 6, NT = 5, NV = 12,  // receptors, transporters (DAT), vesicles
+      CAP = 5,                  // dopamine molecules a vesicle can hold
+      RELEASE_SCALE = 10,       // release events per second at the highest dopamine level
+      SYNTH = 0.5,              // refill of the vesicle pool by synthesis, per missing molecule per second
+      CLEAR = 0.04,             // loss from the cleft (diffusion away / breakdown), per molecule per second
+      CAPTURE = 2;              // how quickly a free transporter takes up a molecule that is next to it
+let P = K.params, rate = 4, W = 0, H = 0, orbs = [], last = performance.now(), acc = 0, synAcc = 0;
+const busy = Array(NR).fill(false), col = {};
+const ves = Array.from({ length: NV }, (_, i) => ({ lvl: ((i * 5) % 3) / 2, n: 3, mode: 0, t: 0, y: 0, x: 0, home: 0, dock: 0, flash: 0 }));
 K.onUpdate(p => { P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n)); });
 
 function fit() {
@@ -14,20 +20,48 @@ function fit() {
   g.setTransform(d, 0, 0, d, 0, 0);
 }
 const datX = i => W * (0.08 + 0.84 * i / (NT - 1)), recX = i => W * (0.12 + 0.76 * i / (NR - 1));
+// reuptake target: an emptier vesicle that is close by
+const pickVesicle = x => { let best = 0, bs = 1e9; ves.forEach((v, i) => { const s = v.n * 30 + Math.abs(v.x - x) * 0.5 + Math.random() * 20; if (s < bs) { bs = s; best = i; } }); return best; };
 
 function step(dt, preY, postY, b) {
+  // 1. vesicles: dock at the membrane, release one molecule into the cleft, return
+  ves.forEach((v, i) => {
+    v.x = W * (0.05 + 0.9 * (i + 0.5) / NV); v.home = preY * (0.28 + 0.38 * v.lvl); v.dock = preY - 13;
+    v.flash = Math.max(0, v.flash - dt * 2.5);
+    if (v.mode === 1) {
+      v.t += dt; const q = Math.min(1, v.t / 0.25); v.y = v.home + (v.dock - v.home) * q;
+      if (q >= 1) { if (v.n > 0) { v.n--; v.flash = 1; orbs.push({ x: v.x, y: preY + 5, vx: 0, vy: 25, r: -1, t: 0, s: 0 }); } v.mode = 2; v.t = 0; }
+    } else if (v.mode === 2) {
+      v.t += dt; const q = Math.min(1, v.t / 0.35); v.y = v.dock + (v.home - v.dock) * q; if (q >= 1) v.mode = 0;
+    } else v.y = v.home;
+  });
   acc += rate * dt;
-  while (acc >= 1) { acc--; if (orbs.length < 350) orbs.push({ x: W * (0.04 + 0.92 * Math.random()), y: preY + 5, vx: 0, vy: 25, r: -1, t: 0 }); }
+  while (acc >= 1) {   // start a release from a filled vesicle (more content = more likely)
+    acc--; const cand = ves.filter(v => v.mode === 0 && v.n > 0);
+    let r = Math.random() * cand.reduce((s, v) => s + v.n, 0);
+    for (const v of cand) { r -= v.n; if (r <= 0) { v.mode = 1; v.t = 0; break; } }
+  }
+  // 2. synthesis slowly refills vesicles that run low
+  synAcc += SYNTH * (NV * CAP - ves.reduce((s, v) => s + v.n, 0)) * dt;
+  while (synAcc >= 1) { synAcc--; const v = ves.reduce((a, z) => z.n < a.n ? z : a); if (v.n < CAP) v.n++; }
+  // 3. molecules
   const damp = Math.exp(-4 * dt);
   orbs = orbs.filter(o => {
+    if (o.s === 1) {   // taken up: travels through the terminal into a vesicle
+      const v = ves[o.tgt], dx = v.x - o.x, dy = v.y - o.y, d = Math.hypot(dx, dy);
+      if (d < 7) { if (v.n < CAP) { v.n++; v.flash = 0.6; } return false; }
+      o.x += dx / d * 110 * dt + (Math.random() - .5) * 80 * dt; o.y = Math.min(preY - 4, o.y + dy / d * 110 * dt + (Math.random() - .5) * 80 * dt);
+      return true;
+    }
     if (o.r >= 0) { o.t -= dt; if (o.t > 0) return true; busy[o.r] = false; o.r = -1; o.vy = -30; return true; }
+    if (Math.random() < CLEAR * dt) return false;
     o.vx = (o.vx + (Math.random() - .5) * 1500 * dt) * damp; o.vy = (o.vy + (Math.random() - .5) * 1500 * dt) * damp;
     o.x += o.vx * dt; o.y += o.vy * dt;
     if (o.x < 3 || o.x > W - 3) { o.vx *= -1; o.x = Math.min(W - 3, Math.max(3, o.x)); }
     if (o.y < preY + 4) { o.vy = Math.abs(o.vy); o.y = preY + 4; }
     if (o.y > postY - 4) { o.vy = -Math.abs(o.vy); o.y = postY - 4; }
-    if (o.y < preY + 14) for (let i = 0; i < NT; i++)
-      if (Math.abs(o.x - datX(i)) < 12 && Math.random() < (1 - b) * dt * 6) return false;
+    if (o.y < preY + 20) for (let i = 0; i < NT; i++)
+      if (Math.abs(o.x - datX(i)) < 18 && Math.random() < (1 - b) * dt * CAPTURE) { o.s = 1; o.tgt = pickVesicle(datX(i)); o.x = datX(i); o.y = preY - 8; return true; }
     if (o.y > postY - 14) for (let i = 0; i < NR; i++)
       if (!busy[i] && Math.abs(o.x - recX(i)) < 10 && Math.random() < dt * 4) {
         busy[i] = true; o.r = i; o.x = recX(i); o.y = postY - 7; o.t = 0.5 + Math.random() * 0.8; break;
@@ -42,9 +76,12 @@ function draw(preY, postY, b) {
   g.fillStyle = col['--ink']; g.globalAlpha = .07; g.fillRect(0, postY, W, H - postY); g.globalAlpha = 1;
   g.strokeStyle = col['--ink']; g.lineWidth = 2; g.beginPath();
   g.moveTo(0, preY); g.lineTo(W, preY); g.moveTo(0, postY); g.lineTo(W, postY); g.stroke();
-  g.strokeStyle = col['--da']; g.globalAlpha = .45; g.lineWidth = 1.5;
-  for (let i = 0; i < 9; i++) { g.beginPath(); g.arc(W * (0.08 + 0.105 * i), preY * (0.3 + 0.35 * ((i * 5) % 3) / 2), 9, 0, 7); g.stroke(); }
-  g.globalAlpha = 1;
+  ves.forEach(v => {   // vesicles with their dopamine content
+    g.strokeStyle = col['--da']; g.globalAlpha = .5 + .5 * v.flash; g.lineWidth = 1.5 + v.flash;
+    g.beginPath(); g.arc(v.x, v.y, 9, 0, 7); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = col['--da'];
+    for (let k = 0; k < v.n; k++) { const a = 2 * Math.PI * k / CAP; g.beginPath(); g.arc(v.x + 4.2 * Math.cos(a), v.y + 4.2 * Math.sin(a), 2, 0, 7); g.fill(); }
+  });
   for (let i = 0; i < NT; i++) {   // dopamine transporters (violet dot = blocked by methylphenidate)
     g.fillStyle = col['--ink']; g.globalAlpha = .75; g.fillRect(datX(i) - 6, preY - 6, 12, 12); g.globalAlpha = 1;
     g.fillStyle = col['--mph']; g.globalAlpha = Math.min(1, b * 1.3);
@@ -66,7 +103,7 @@ function loop(now) {
   fit();
   if (W && col['--da']) {
     const preY = H * 0.3, postY = H * 0.74, s = K.compute(P.da, P.mph, P.profile), b = s.occupancy;
-    rate = 22 * s.start / K.PAPER.DA_MAX;   // orbs released per second follow the (profile-adjusted) dopamine level
+    rate = RELEASE_SCALE * s.start / K.PAPER.DA_MAX;   // release events per second follow the (profile-adjusted) dopamine level
     step(dt, preY, postY, b); draw(preY, postY, b);
   }
   requestAnimationFrame(loop);
