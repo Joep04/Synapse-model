@@ -30,12 +30,12 @@ Brain dopamine has long been implicated in cognitive control processes, includin
 
 There are five main types of dopamine receptors. In our model we primarily focus on D1, because evidence supports an inverted-U relationship with D1 receptor stimulation and working-memory performance. D2 receptor activation also influences working-memory-related neural activity, but the relationship is less well established. 
 
-D1 receptors are involved in memory, attention, impulse control, regulation of renal function, and locomotion. They are primarily located in the striatum and the cerebral cortex. In the prefrontal cortex, D1 receptor stimulation is generally associated with reduced neuronal firing. 
-1. Excessive stimulation: Suppression becomes too strong. The activity representing the preferred location decreases, so the neuron loses useful information and spatial tuning deteriorates. 
-2. Moderate stimulation: Activity for non-preffered locations is reduced more than activity for the preferred location. The relevant information stands out more clearly, potentially improving working memory. 
-3. Too little stimulation: Neuronal activity can be noisy, so the preferred location is not represented clearly. 
+D1 receptors are involved in memory, attention, impulse control, regulation of renal function, and locomotion. They are primarily located in the striatum and the cerebral cortex. In the prefrontal cortex, D1 receptor stimulation is generally associated with reduced neuronal firing. \n
+1. Excessive stimulation: Suppression becomes too strong. The activity representing the preferred location decreases, so the neuron loses useful information and spatial tuning deteriorates. \n
+2. Moderate stimulation: Activity for non-preffered locations is reduced more than activity for the preferred location. The relevant information stands out more clearly, potentially improving working memory. \n
+3. Too little stimulation: Neuronal activity can be noisy, so the preferred location is not represented clearly. \n
 
-Psychopharmacological studies with human volunteers indicate that the effect of dopaminergic drug administration depends on baseline level of performance. It improved cognition in subjects with lower baseline working-memory, and worsening cognition in those with higher baseline working memory capacity. 
+Psychopharmacological studies with human volunteers indicate that the effect of dopaminergic drug administration depends on baseline level of performance. It improved cognition in subjects with lower baseline working-memory, and worsening cognition in those with higher baseline working memory capacity. \n
 1. Low baseline (Our ADHD stand-in): There is too little stimulation of the D1 receptors. The dose moves the individual towards the peak, so performance increases. \n
 2. Near peak baseline: There is moderate stimulation and the working-memory performance is already in the optimal zone. A dose gives little benefit. \n
 3. High baseline: A dose pushes the individual past the peak. Resulting in excessive stimulation of the D1 receptor, and thus worsening working-memory performance. \n
