@@ -101,7 +101,7 @@ function draw() {
 
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; fit();
-  if (W && sim && col['--da']) { step(dt); draw(); }
+  if (W && sim && col['--da']) { step(dt * (P.speed || 1)); draw(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
