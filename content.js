@@ -76,9 +76,9 @@ Here, $s$ represents the fraction of open NMDA channels, $\tau_s$ is the decay t
     {
       title: "4. The valley model",
       text: `
-The ring attractor model describes how neurons form an activity bump to represent a remembered location. The valley model describes the stability of that activity. 
-- A deep valley = A stable memory: The ball is stable inside the valley and cannot easily roll out. The remembered location is maintained. The excitation and inhibition are well balanced, and disturbances are small. 
-- A shallow valley = A fragile memory: The ball is less stable inside the valley and can easily roll out. The remembered location may drift, producing a less accurate memory. Excitation and inhibition are not well balanced and noise or other disturbances can shift the activity bump more easily. 
+The ring attractor model describes how neurons form an activity bump to represent a remembered location. The valley model describes the stability of that activity. \n
+- A deep valley = A stable memory: The ball is stable inside the valley and cannot easily roll out. The remembered location is maintained. The excitation and inhibition are well balanced, and disturbances are small. \n
+- A shallow valley = A fragile memory: The ball is less stable inside the valley and can easily roll out. The remembered location may drift, producing a less accurate memory. Excitation and inhibition are not well balanced and noise or other disturbances can shift the activity bump more easily. \n
 How does dopamine connect to this? A deep valley essentially represents a relatively stable working-mempory state, associated with moderate D1 receptor stimulation when it is near the peak of the inverted-U curve. The shallow valley represents a less stable working-memory, linked to either too little or too much D1 stimulation. 
 
 `
