@@ -73,10 +73,16 @@ A) From dose (mg) to transporter occupancy (Hill equation): Receptor saturation 
 - $ED_{50}$:Tied to body weight (0.25mg x weighting, which amounts to 17.5mg for a standard 70kg adult).
 - $E_{max}$: Set to 90% (the maximum achievable range of transporter blockade).
 - <i>n</i> (Hill coefficient): Set to 1.35 to match curve steepness precisely with clinical data points (such as ~12% at 5mg and ~73% at 40mg).
+$$
+\text{Occupancy (\%)} = \frac{E_{\text{max}} \times \text{Dosis}^n}{\text{ED}_{50}^n + \text{Dosis}^n}
+$$
 B) From occupancy to dopamine increase (Inverse-linear mechanism)
 - If a fraction O (e.g., 0.70 or 70%) of the transporters is occupied, an unoccupied fraction of 1-O remains to clear dopamine.
 - Clearance capacity drops inversely with occupancy. The multiplication factor for extracellular dopamine becomes $1/{1-O}$.
 - Converted to a percentage increase relative to baseline (0% change):
+$$
+\text{Dopamine Increase (\%)} = \left( \frac{1}{1 - O} - 1 \right) \times 100
+$$
 C) The inverted-U performance output: The calculated dopamine level is subsequently fed into a Gaussian-like performance function in the model.
 `
     },
