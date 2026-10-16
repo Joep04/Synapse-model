@@ -175,6 +175,7 @@ function openInfo(i) {
   closeInfo();
   const x = CONTENT.models[i] || { title: MODELS[i].title, text: '' };
   popup.innerHTML = `<button class="close" aria-label="Close">&times;</button><h2>${x.title}</h2>${paragraphs(x.text)}`;
+  typeset(popup);
   popup.className = i % 2 === 0 ? 'right' : 'left';
   popup.hidden = false; popup.scrollTop = 0;
   cards[i].classList.add('open'); btns[i].setAttribute('aria-expanded', 'true'); openIdx = i;
@@ -185,6 +186,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo();
 
 document.getElementById('about').innerHTML =
   paragraphs(CONTENT.intro) + CONTENT.models.map(x => `<h2>${x.title}</h2>${paragraphs(x.text)}`).join('');
+  typeset(document.getElementById('about'));
 
 const tabs = [['tab-models', 'models'], ['tab-about', 'about']];
 tabs.forEach(([btn, panel]) => document.getElementById(btn).addEventListener('click', () => {
