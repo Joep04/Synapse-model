@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/contrib/auto-render.min.js"></script>
 <style>
 :root{
   --bg:#e8edee;--panel:#f8faf9;--ink:#12262c;--mute:#5a6e74;--line:#c9d4d6;
@@ -68,6 +71,9 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
 #about{max-width:68ch;overflow-y:auto;flex:1;min-height:0}
 #about h2{font:600 1.5rem var(--serif);margin:36px 0 8px}
 #about h2:first-child{margin-top:0}
+.math{margin:.5em 0 1.1em;overflow-x:auto;overflow-y:hidden}
+#about ul,#about ol,#popup ul,#popup ol{margin:0 0 1em;padding-left:1.3em}
+#about li,#popup li{margin-bottom:.3em}
 #about p{margin:0 0 1em}
 [hidden]{display:none!important}
 @media (max-width:860px){
@@ -129,7 +135,24 @@ addEventListener('message', e => {
   if (JSON.stringify(shared) !== before) sendAll();
 });
 
-const paragraphs = t => t.trim().split(/\n\s*\n/).map(p => `<p>${p.trim()}</p>`).join('');
+const paragraphs = t => {
+  const math = [];
+  t = t.replace(/\$\$([\s\S]*?)\$\$/g, (_, m) => { math.push(m.replace(/\n\s*\n/g, '\n').trim()); return `\n@@MATH${math.length - 1}@@\n`; });
+  let html = '', list = null;
+  const close = () => { if (list) { html += `</${list}>`; list = null; } };
+  t.split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
+    let m;
+    if ((m = l.match(/^@@MATH(\d+)@@$/))) { close(); html += `<div class="math">$$${math[m[1]]}$$</div>`; }
+    else if ((m = l.match(/^[-•]\s+(.*)/))) { if (list !== 'ul') { close(); html += '<ul>'; list = 'ul'; } html += `<li>${m[1]}</li>`; }
+    else if ((m = l.match(/^(\d+)[.)]\s+(.*)/))) { if (list !== 'ol') { close(); html += `<ol start="${m[1]}">`; list = 'ol'; } html += `<li>${m[2]}</li>`; }
+    else { close(); html += `<p>${l}</p>`; }
+  });
+  close(); return html;
+};
+function typeset(el) {
+  if (window.renderMathInElement) renderMathInElement(el, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }], throwOnError: false });
+  else addEventListener('load', () => typeset(el), { once: true });
+}
 
 const main = document.getElementById('models'), cards = [], btns = [];
 MODELS.forEach(m => {
