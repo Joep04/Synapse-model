@@ -3,6 +3,7 @@
 <body><canvas id="c"></canvas>
 <script>
 const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
+let lastReset = null;
 // Performance (0-1) comes from model 2 via PKPD.share({ perfUnmedicated, perfMedicated }).
 // These fallbacks are used until model 2 provides values.
 const FALLBACK = { base: 0.45, med: 0.75 };
@@ -34,6 +35,8 @@ function newTrial() {
   shareState();
 }
 K.onUpdate(p => {
+  const rs = p.reset || 0;   // Reset button in the sidebar: new trial and a fresh win/loss count
+  if (lastReset === null) lastReset = rs; else if (rs !== lastReset) { lastReset = rs; score = [{ w: 0, l: 0 }, { w: 0, l: 0 }]; if (sim) newTrial(); }
   const key = p.da + '|' + p.mph + '|' + p.profile;
   if (lastKey !== null && key !== lastKey) score = [{ w: 0, l: 0 }, { w: 0, l: 0 }];
   lastKey = key;
@@ -103,7 +106,7 @@ function draw() {
  
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; fit();
-  if (W && sim && col['--da']) { step(dt * (P.speed || 1)); draw(); }
+  if (W && sim && col['--da']) { if (!P.paused) step(dt * (P.speed || 1)); draw(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

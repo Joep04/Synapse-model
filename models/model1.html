@@ -1,112 +1,202 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><script src="../bridge.js"></script></head>
-<body><canvas id="c"></canvas>
+<html><head><meta charset="utf-8"><script src="../bridge.js"></script>
+<style>
+body{display:flex;flex-direction:column;gap:6px;color:var(--ink);font-family:var(--sans)}
+.wrap{position:relative;flex:1;min-height:70px}
+canvas{position:absolute;inset:0}
+.legend{flex:none;display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px;color:var(--mute)}
+.key{display:inline-flex;align-items:center;gap:5px}
+.key i{display:inline-block;width:9px;height:9px}
+.stats{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat{background:rgba(127,140,145,.14);border-radius:6px;padding:4px 9px;font-size:11px;line-height:1.3;color:var(--mute)}
+.stat strong{font-size:17px;font-weight:600;color:var(--ink);margin-right:4px}
+#explanation{flex:none;margin:0;font-size:11.5px;line-height:1.35;color:var(--mute)}
+</style></head>
+<body>
+<div class="wrap"><canvas id="c"></canvas></div>
+<div class="legend">
+  <span class="key"><i style="border-radius:50%;background:var(--da)"></i>Dopamine</span>
+  <span class="key"><i style="border-radius:50%;background:var(--mph)"></i>Methylphenidate</span>
+  <span class="key"><i style="border-radius:2px;background:var(--ink);opacity:.75"></i>DAT transporter</span>
+  <span class="key"><i style="border-radius:3px 3px 1px 1px;background:var(--mute)"></i>Postsynaptic receptor</span>
+  <span class="key"><i style="border-radius:50%;border:1.5px solid var(--da);width:7px;height:7px"></i>Vesicle</span>
+</div>
+<div class="stats">
+  <div class="stat">Dopamine in cleft<br><strong id="daN">0</strong>visible molecules</div>
+  <div class="stat">DAT blocked<br><strong id="blkN">0 / 12</strong>occupied by MPH</div>
+  <div class="stat">Dopamine reuptake<br><strong id="upN">0</strong>uptake events</div>
+</div>
+<p id="explanation"></p>
 <script>
 const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
-const NR = 6, NT = 5, NV = 12,  // receptors, transporters (DAT), vesicles
-      CAP = 5,                  // dopamine molecules a vesicle can hold
-      RELEASE_SCALE = 10,       // release events per second at the highest dopamine level
-      SYNTH = 0.5,              // refill of the vesicle pool by synthesis, per missing molecule per second
-      CLEAR = 0.04,             // loss from the cleft (diffusion away / breakdown), per molecule per second
-      CAPTURE = 2;              // how quickly a free transporter takes up a molecule that is next to it
-let P = K.params, rate = 4, W = 0, H = 0, orbs = [], last = performance.now(), acc = 0, synAcc = 0;
-const busy = Array(NR).fill(false), col = {};
-const ves = Array.from({ length: NV }, (_, i) => ({ lvl: ((i * 5) % 3) / 2, n: 3, mode: 0, t: 0, y: 0, x: 0, home: 0, dock: 0, flash: 0 }));
-K.onUpdate(p => { P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n)); });
+
+// ---- Simulation rules, ported from the uploaded synapse model (60 ticks per second) ----
+const LW = 960,            // logical width; the height follows the shape of the panel
+      NDAT = 12, NV = 12,  // transporters (and receptors), vesicles
+      CAP = 5,             // dopamine molecules per vesicle
+      PULSE = 48,          // ticks between dopamine release pulses
+      RELEASE_AT_100 = 5,  // molecules per pulse at 100% dopamine (ADHD, 60% -> 3)
+      MPH_ARRIVAL = 0.06,  // chance per tick that a methylphenidate molecule enters, per (MPH / EC50)
+      MPH_MAX = 160,       // visual cap on methylphenidate molecules
+      BLOCK_TICKS = 220,   // how long a transporter stays blocked after methylphenidate binds
+      SYNTH = 0.5;         // refill of the vesicle pool by synthesis (per missing molecule per second)
+
+let P = K.params, W = 0, H = 0, S = 1, Hl = 300, last = performance.now(), acc = 0, synAcc = 0, lastReset = null;
+let frame = 0, uptake = 0, da = [], mph = [], cur = { start: 100 };
+const col = {}, shown = {};
+const dat = Array.from({ length: NDAT }, (_, i) => ({ x: 105 + i * 68, blocked: 0 }));
+const glow = Array(NDAT).fill(0);
+const ves = Array.from({ length: NV }, (_, i) => ({ x: 139 + i * 68, lvl: ((i * 5) % 3) / 2, n: 3, mode: 0, t: 0, y: 0, flash: 0 }));
+
+function resetModel() {
+  da = []; mph = []; frame = 0; uptake = 0; synAcc = 0;
+  dat.forEach(t => t.blocked = 0); glow.fill(0);
+  ves.forEach(v => { v.n = 3; v.mode = 0; v.t = 0; v.flash = 0; });
+}
+K.onUpdate(p => {
+  const rs = p.reset || 0;   // Reset button in the sidebar
+  if (lastReset === null) lastReset = rs; else if (rs !== lastReset) { lastReset = rs; resetModel(); }
+  P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n));
+});
 
 function fit() {
   const d = devicePixelRatio || 1; W = c.clientWidth; H = c.clientHeight;
-  if (c.width !== Math.round(W * d) || c.height !== Math.round(H * d)) { c.width = W * d; c.height = H * d; }
-  g.setTransform(d, 0, 0, d, 0, 0);
+  if (!W || !H) return false;
+  if (c.width !== Math.round(W * d) || c.height !== Math.round(H * d)) { c.width = Math.round(W * d); c.height = Math.round(H * d); }
+  S = W / LW; Hl = H / S; g.setTransform(d * S, 0, 0, d * S, 0, 0);
+  return true;
 }
-const datX = i => W * (0.08 + 0.84 * i / (NT - 1)), recX = i => W * (0.12 + 0.76 * i / (NR - 1));
 // reuptake target: an emptier vesicle that is close by
-const pickVesicle = x => { let best = 0, bs = 1e9; ves.forEach((v, i) => { const s = v.n * 30 + Math.abs(v.x - x) * 0.5 + Math.random() * 20; if (s < bs) { bs = s; best = i; } }); return best; };
+const pickVesicle = x => { let best = 0, bs = 1e9; ves.forEach((v, i) => { const s = v.n * 60 + Math.abs(v.x - x) * 0.5 + Math.random() * 40; if (s < bs) { bs = s; best = i; } }); return best; };
 
-function step(dt, preY, postY, b) {
-  // 1. vesicles: dock at the membrane, release one molecule into the cleft, return
-  ves.forEach((v, i) => {
-    v.x = W * (0.05 + 0.9 * (i + 0.5) / NV); v.home = preY * (0.28 + 0.38 * v.lvl); v.dock = preY - 13;
-    v.flash = Math.max(0, v.flash - dt * 2.5);
-    if (v.mode === 1) {
-      v.t += dt; const q = Math.min(1, v.t / 0.25); v.y = v.home + (v.dock - v.home) * q;
-      if (q >= 1) { if (v.n > 0) { v.n--; v.flash = 1; orbs.push({ x: v.x, y: preY + 5, vx: 0, vy: 25, r: -1, t: 0, s: 0 }); } v.mode = 2; v.t = 0; }
-    } else if (v.mode === 2) {
-      v.t += dt; const q = Math.min(1, v.t / 0.35); v.y = v.dock + (v.home - v.dock) * q; if (q >= 1) v.mode = 0;
-    } else v.y = v.home;
-  });
-  acc += rate * dt;
-  while (acc >= 1) {   // start a release from a filled vesicle (more content = more likely)
-    acc--; const cand = ves.filter(v => v.mode === 0 && v.n > 0);
-    let r = Math.random() * cand.reduce((s, v) => s + v.n, 0);
-    for (const v of cand) { r -= v.n; if (r <= 0) { v.mode = 1; v.t = 0; break; } }
-  }
-  // 2. synthesis slowly refills vesicles that run low
-  synAcc += SYNTH * (NV * CAP - ves.reduce((s, v) => s + v.n, 0)) * dt;
-  while (synAcc >= 1) { synAcc--; const v = ves.reduce((a, z) => z.n < a.n ? z : a); if (v.n < CAP) v.n++; }
-  // 3. molecules
-  const damp = Math.exp(-4 * dt);
-  orbs = orbs.filter(o => {
-    if (o.s === 1) {   // taken up: travels through the terminal into a vesicle
-      const v = ves[o.tgt], dx = v.x - o.x, dy = v.y - o.y, d = Math.hypot(dx, dy);
-      if (d < 7) { if (v.n < CAP) { v.n++; v.flash = 0.6; } return false; }
-      o.x += dx / d * 110 * dt + (Math.random() - .5) * 80 * dt; o.y = Math.min(preY - 4, o.y + dy / d * 110 * dt + (Math.random() - .5) * 80 * dt);
-      return true;
+function tick() {
+  const top = Hl * 0.30, bot = Hl * 0.74;
+  frame++;
+  // 1. periodic dopamine release: each pulse empties one molecule from several vesicles
+  if (frame % PULSE === 0) {
+    const n = Math.round(RELEASE_AT_100 * cur.start / 100);
+    for (let k = 0; k < n; k++) {
+      const cand = ves.filter(v => v.mode === 0 && v.n > 0); if (!cand.length) break;
+      let r = Math.random() * cand.reduce((s, v) => s + v.n, 0);
+      for (const v of cand) { r -= v.n; if (r <= 0) { v.mode = 1; v.t = 0; break; } }
     }
-    if (o.r >= 0) { o.t -= dt; if (o.t > 0) return true; busy[o.r] = false; o.r = -1; o.vy = -30; return true; }
-    if (Math.random() < CLEAR * dt) return false;
-    o.vx = (o.vx + (Math.random() - .5) * 1500 * dt) * damp; o.vy = (o.vy + (Math.random() - .5) * 1500 * dt) * damp;
-    o.x += o.vx * dt; o.y += o.vy * dt;
-    if (o.x < 3 || o.x > W - 3) { o.vx *= -1; o.x = Math.min(W - 3, Math.max(3, o.x)); }
-    if (o.y < preY + 4) { o.vy = Math.abs(o.vy); o.y = preY + 4; }
-    if (o.y > postY - 4) { o.vy = -Math.abs(o.vy); o.y = postY - 4; }
-    if (o.y < preY + 20) for (let i = 0; i < NT; i++)
-      if (Math.abs(o.x - datX(i)) < 18 && Math.random() < (1 - b) * dt * CAPTURE) { o.s = 1; o.tgt = pickVesicle(datX(i)); o.x = datX(i); o.y = preY - 8; return true; }
-    if (o.y > postY - 14) for (let i = 0; i < NR; i++)
-      if (!busy[i] && Math.abs(o.x - recX(i)) < 10 && Math.random() < dt * 4) {
-        busy[i] = true; o.r = i; o.x = recX(i); o.y = postY - 7; o.t = 0.5 + Math.random() * 0.8; break;
-      }
-    return true;
+  }
+  // 2. vesicles dock at the membrane, release, and return
+  ves.forEach(v => {
+    const home = top * (0.30 + 0.36 * v.lvl), dock = top - 15;
+    v.flash = Math.max(0, v.flash - 0.04);
+    if (v.mode === 1) {
+      v.t++; const q = Math.min(1, v.t / 15); v.y = home + (dock - home) * q;
+      if (q >= 1) { if (v.n > 0) { v.n--; v.flash = 1; da.push({ x: v.x, y: top + 6, vx: (Math.random() - .5) * 2.8, vy: 1 + Math.random() * 1.4, age: 0, s: 0 }); } v.mode = 2; v.t = 0; }
+    } else if (v.mode === 2) {
+      v.t++; const q = Math.min(1, v.t / 21); v.y = dock + (home - dock) * q; if (q >= 1) v.mode = 0;
+    } else v.y = home;
   });
+  // synthesis slowly refills vesicles that run low
+  synAcc += SYNTH * (NV * CAP - ves.reduce((s, v) => s + v.n, 0)) / 60;
+  while (synAcc >= 1) { synAcc--; const v = ves.reduce((a, z) => z.n < a.n ? z : a); if (v.n < CAP) v.n++; }
+  // 3. methylphenidate enters the cleft (more at a higher dose)
+  const ratio = P.mph / K.PAPER.MPH.ec50;
+  if (ratio > 0 && mph.length < MPH_MAX && Math.random() < MPH_ARRIVAL * ratio)
+    mph.push({ x: 35 + Math.random() * (LW - 70), y: top + 20 + Math.random() * Math.max(10, Math.min(100, bot - top - 40)),
+               vx: (Math.random() - .5) * 1.8, vy: (Math.random() - .5) * 1.5, age: 0 });
+  dat.forEach(t => { if (t.blocked > 0) t.blocked--; });
+  // 4. methylphenidate moves and binds a free transporter (which it then blocks for a while)
+  mph.forEach(m => {
+    m.x += m.vx; m.y += m.vy; m.age++;
+    if (m.x < 8 || m.x > LW - 8) m.vx *= -1;
+    if (m.y < top + 5 || m.y > bot - 5) m.vy *= -1;
+    for (const t of dat)
+      if (t.blocked <= 0 && Math.abs(m.x - t.x) < 13 && Math.abs(m.y - top) < 19) { t.blocked = BLOCK_TICKS; m.remove = true; break; }
+  });
+  mph = mph.filter(m => !m.remove && m.age < 700);
+  // 5. dopamine diffuses; a free transporter takes it up, and it travels into a vesicle to be reused
+  da.forEach(d => {
+    if (d.s === 1) {
+      const v = ves[d.tgt], dx = v.x - d.x, dy = v.y - d.y, dist = Math.hypot(dx, dy);
+      if (dist < 10) { if (v.n < CAP) { v.n++; v.flash = 0.6; } d.remove = true; return; }
+      d.x += dx / dist * 2.6 + (Math.random() - .5) * 1.4; d.y = Math.min(top - 5, d.y + dy / dist * 2.6 + (Math.random() - .5) * 1.4);
+      return;
+    }
+    d.x += d.vx; d.y += d.vy; d.age++;
+    d.vx += (Math.random() - .5) * 0.45; d.vy += (Math.random() - .5) * 0.45;
+    d.vx = Math.max(-2.4, Math.min(2.4, d.vx)); d.vy = Math.max(-2.4, Math.min(2.4, d.vy));
+    if (d.x < 8 || d.x > LW - 8) d.vx *= -1;
+    if (d.y < top + 5) d.vy = Math.abs(d.vy);
+    if (d.y > bot - 8) { d.vy = -Math.abs(d.vy); glow[Math.max(0, Math.min(NDAT - 1, Math.round((d.x - 105) / 68)))] = 25; }
+    for (const t of dat)
+      if (t.blocked <= 0 && Math.abs(d.x - t.x) < 12 && Math.abs(d.y - top) < 10) {
+        d.s = 1; d.tgt = pickVesicle(t.x); d.x = t.x; d.y = top - 8; uptake++; break;
+      }
+    if (d.age > 1400) d.remove = true;   // old molecules are broken down
+  });
+  da = da.filter(d => !d.remove);
+  for (let i = 0; i < NDAT; i++) glow[i] = Math.max(0, glow[i] - 1);
 }
 
-function draw(preY, postY, b) {
-  g.clearRect(0, 0, W, H);
-  g.globalAlpha = .12; g.fillStyle = col['--da']; g.fillRect(0, 0, W, preY);
-  g.fillStyle = col['--ink']; g.globalAlpha = .07; g.fillRect(0, postY, W, H - postY); g.globalAlpha = 1;
-  g.strokeStyle = col['--ink']; g.lineWidth = 2; g.beginPath();
-  g.moveTo(0, preY); g.lineTo(W, preY); g.moveTo(0, postY); g.lineTo(W, postY); g.stroke();
+function scenario() {
+  const prof = K.PROFILES[P.profile], on = P.mph > 0;
+  if (!prof) return 'CUSTOM SETTINGS' + (on ? ' + METHYLPHENIDATE' : '');
+  if (P.profile === 'typical') return 'NORMAL REFERENCE' + (on ? ' + METHYLPHENIDATE' : '');
+  return prof.name.toUpperCase() + (on ? ' + METHYLPHENIDATE' : ': ILLUSTRATIVE SCENARIO');
+}
+function message(blocked) {
+  let m;
+  if (P.mph > 0) m = 'Methylphenidate molecules can occupy DAT. Blocked transporters cannot take up dopamine, so dopamine may remain in the cleft longer.';
+  else if (P.profile === 'typical') m = 'Dopamine is released into the cleft. When a molecule reaches an available DAT, it is taken back into the presynaptic neuron and stored in a vesicle again.';
+  else if (P.profile === 'adhd') m = 'This illustrative scenario uses a smaller dopamine release pulse. It is a teaching simplification, not a universal explanation of ADHD.';
+  else if (P.profile === 'anxiety') m = 'This illustrative scenario uses a larger dopamine release pulse. It is a teaching simplification, not a universal explanation of anxiety or stress.';
+  else m = 'The dopamine release per pulse follows the baseline dopamine slider.';
+  return m + ` Currently ${blocked} of ${NDAT} transporters are blocked.`;
+}
+
+function draw() {
+  const top = Hl * 0.30, bot = Hl * 0.74, sans = col['--sans'];
+  g.clearRect(0, 0, LW, Hl);
+  g.globalAlpha = .12; g.fillStyle = col['--da']; g.fillRect(0, 0, LW, top);
+  g.fillStyle = col['--ink']; g.globalAlpha = .07; g.fillRect(0, bot, LW, Hl - bot); g.globalAlpha = 1;
+  g.strokeStyle = col['--ink']; g.lineWidth = 3; g.beginPath();
+  g.moveTo(0, top); g.lineTo(LW, top); g.moveTo(0, bot); g.lineTo(LW, bot); g.stroke();
+  g.fillStyle = col['--mute']; g.textAlign = 'left';
+  g.font = '600 17px ' + sans; g.fillText('PRESYNAPTIC NEURON', 14, 26); g.fillText('POSTSYNAPTIC NEURON', 14, bot + 28);
+  g.font = '15px ' + sans; g.fillText('SYNAPTIC CLEFT', 14, top + 26);
+  g.textAlign = 'right'; g.font = '600 15px ' + sans; g.fillText(scenario(), LW - 14, 26); g.textAlign = 'left';
   ves.forEach(v => {   // vesicles with their dopamine content
-    g.strokeStyle = col['--da']; g.globalAlpha = .5 + .5 * v.flash; g.lineWidth = 1.5 + v.flash;
-    g.beginPath(); g.arc(v.x, v.y, 9, 0, 7); g.stroke(); g.globalAlpha = 1;
+    g.strokeStyle = col['--da']; g.globalAlpha = .55 + .45 * v.flash; g.lineWidth = 2.5 + 1.5 * v.flash;
+    g.beginPath(); g.arc(v.x, v.y, 13, 0, 7); g.stroke(); g.globalAlpha = 1;
     g.fillStyle = col['--da'];
-    for (let k = 0; k < v.n; k++) { const a = 2 * Math.PI * k / CAP; g.beginPath(); g.arc(v.x + 4.2 * Math.cos(a), v.y + 4.2 * Math.sin(a), 2, 0, 7); g.fill(); }
+    for (let k = 0; k < v.n; k++) { const a = 2 * Math.PI * k / CAP; g.beginPath(); g.arc(v.x + 6.5 * Math.cos(a), v.y + 6.5 * Math.sin(a), 3, 0, 7); g.fill(); }
   });
-  for (let i = 0; i < NT; i++) {   // dopamine transporters (violet dot = blocked by methylphenidate)
-    g.fillStyle = col['--ink']; g.globalAlpha = .75; g.fillRect(datX(i) - 6, preY - 6, 12, 12); g.globalAlpha = 1;
-    g.fillStyle = col['--mph']; g.globalAlpha = Math.min(1, b * 1.3);
-    g.beginPath(); g.arc(datX(i), preY + 11, 4.5, 0, 7); g.fill(); g.globalAlpha = 1;
+  dat.forEach(t => {   // dopamine transporters (purple = blocked by methylphenidate)
+    g.fillStyle = col['--ink']; g.globalAlpha = .75; g.fillRect(t.x - 10, top - 11, 20, 24); g.globalAlpha = 1;
+    if (t.blocked > 0) { g.fillStyle = col['--mph']; g.beginPath(); g.arc(t.x, top + 3, 9, 0, 7); g.fill(); g.strokeStyle = col['--panel']; g.lineWidth = 2; g.stroke(); }
+  });
+  for (let i = 0; i < NDAT; i++) {   // receptors light up when dopamine reaches them
+    const x = 105 + i * 68;
+    g.fillStyle = glow[i] > 0 ? col['--da'] : col['--mute'];
+    g.beginPath(); g.moveTo(x - 9, bot - 7); g.lineTo(x - 9, bot - 23); g.lineTo(x - 4, bot - 29); g.lineTo(x + 4, bot - 29); g.lineTo(x + 9, bot - 23); g.lineTo(x + 9, bot - 7); g.closePath(); g.fill();
   }
-  for (let i = 0; i < NR; i++) {   // receptors
-    const x = recX(i);
-    g.fillStyle = busy[i] ? col['--da'] : col['--mute']; g.fillRect(x - 5, postY - 9, 10, 9);
-    if (busy[i]) { g.strokeStyle = col['--da']; g.lineWidth = 1.5; g.beginPath(); g.arc(x, postY - 7, 11, 0, 7); g.stroke(); }
-  }
-  g.fillStyle = col['--da'];
-  orbs.forEach(o => { g.beginPath(); g.arc(o.x, o.y, 3.3, 0, 7); g.fill(); });
-  g.font = '11px ' + col['--sans']; g.fillStyle = col['--mute']; g.textAlign = 'left';
-  g.fillText('Presynaptic terminal', 8, 16); g.fillText('Postsynaptic neuron', 8, H - 8);
+  g.fillStyle = col['--mph']; mph.forEach(m => { g.beginPath(); g.arc(m.x, m.y, 6.5, 0, 7); g.fill(); });
+  g.fillStyle = col['--da']; da.forEach(d => { g.beginPath(); g.arc(d.x, d.y, 6, 0, 7); g.fill(); });
+}
+
+function show(id, v) { if (shown[id] !== v) { shown[id] = v; document.getElementById(id).textContent = v; } }
+function stats() {
+  const blocked = dat.filter(t => t.blocked > 0).length;
+  show('daN', da.filter(d => d.s !== 1).length); show('blkN', blocked + ' / ' + NDAT); show('upN', uptake);
+  show('explanation', message(blocked));
 }
 
 function loop(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  fit();
-  if (W && col['--da']) {
-    const preY = H * 0.3, postY = H * 0.74, s = K.compute(P.da, P.mph, P.profile), b = s.occupancy;
-    rate = RELEASE_SCALE * s.start / K.PAPER.DA_MAX;   // release events per second follow the (profile-adjusted) dopamine level
-    const total = dt * (P.speed || 1), n = Math.max(1, Math.ceil(total / 0.02));   // speed button: several small steps per frame
-    for (let i = 0; i < n; i++) step(total / n, preY, postY, b);
-    draw(preY, postY, b);
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (fit() && col['--da']) {
+    cur = K.compute(P.da, P.mph, P.profile);
+    if (!P.paused) {   // pause / speed / reset come from the sidebar
+      acc += dt * (P.speed || 1); let n = 0;
+      while (acc >= 1 / 60 && n < 600) { tick(); acc -= 1 / 60; n++; }
+      if (n === 600) acc = 0;
+    }
+    draw(); stats();
   }
   requestAnimationFrame(loop);
 }

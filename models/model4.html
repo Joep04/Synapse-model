@@ -3,6 +3,7 @@
 <body><canvas id="c"></canvas>
 <script>
 const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
+let lastReset = null;
 // Performance (0-1) comes from model 2 via PKPD.share({ perfUnmedicated, perfMedicated }), same as model 3.
 const FALLBACK = { base: 0.45, med: 0.75 };
 // Keep these four equal to model3.html so the ring fades in step with the valley:
@@ -33,6 +34,8 @@ function newTrial(trial) {
     rings: [perf.base, perf.med].map(p => ({ p, r: Float64Array.from({ length: N }, () => I0 / (1 + INH) * (1 + 0.1 * Math.random())), sm: 0, psi: 0, lost: null })) };
 }
 K.onUpdate(p => {
+  const rs = p.reset || 0;   // Reset button in the sidebar (when synced, the valley model's reset starts the new trial)
+  if (lastReset === null) lastReset = rs; else if (rs !== lastReset) { lastReset = rs; if (sim && !sim.synced) newTrial(); }
   P = p; ['--panel','--ink','--mute','--line','--da','--mph','--sans'].forEach(n => col[n] = K.css(n));
   const s = p.shared || {};
   const nb = clamp(s.perfUnmedicated ?? FALLBACK.base), nm = clamp(s.perfMedicated ?? FALLBACK.med);
@@ -101,7 +104,7 @@ function draw() {
 
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; fit();
-  if (W && sim && col['--da']) { step(dt * (P.speed || 1)); draw(); }
+  if (W && sim && col['--da']) { if (!P.paused) step(dt * (P.speed || 1)); draw(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
