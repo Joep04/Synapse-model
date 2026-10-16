@@ -25,7 +25,7 @@ Dopamine is a neurotransmitter in the brain that plays a role in the reward cent
 Differences in dopamine reuptake contributes to altered dopamine signalling in people with ADHD. Specific genes result in higher levels of dopamine transporter channels within the brain. More dopamine channels means that dopamine will be removed more effectively from the synapse, meaning it has less chance of binding with receptors. 
 
 <b>Methylphenidate (MPH)</b>  is a CNS stimulant approved for treatment of ADHD. It inhibits the reuptake of dopamine by blocking transporters. This leads to an increased availability of dopamine in the synaptic space. The inhibitors work by physically blocking the channel. 
-The methylphenidate in the model is shown with a red circle on the transporters, more methylphenidate means a less transparent circle, showing more transporters are blocked.
+The methylphenidate in the model is shown with a purple circle on the transporters, more methylphenidate means a less transparent circle, showing more transporters are blocked.
 
 <b>Important formulas and values for the model</b>
  
@@ -69,13 +69,13 @@ This model stimulates the pharmacokinetics and pharmacodynamics of MPH and its i
 4. Cognitive performance via the classic Inverted-U curve (where both too little and too much dopamine lead to poorer performance).
 
 How are medications and doses formulated? This is handled in two mathematical steps:
-A) From dose (mg) to transporter occupancy (Hill equation): Receptor saturation is typically described using the hill equation. This ensure the curve rises steeply at first, but flattens out at higher doses approaching a maximum (Emax):
-- ED50:Tied to body weight (0.25mg x weighting, which amounts to 17.5mg for a standard 70kg adult).
-- Emax: Set to 90% (the maximum achievable range of transporter blockade).
-- n (Hill coefficient): Set to 1.35 to match curve steepness precisely with clinical data points (such as ~12% at 5mg and ~73% at 40mg).
+A) From dose (mg) to transporter occupancy (Hill equation): Receptor saturation is typically described using the hill equation. This ensure the curve rises steeply at first, but flattens out at higher doses approaching a maximum ($E_{max}$):
+- $ED_{50}$:Tied to body weight (0.25mg x weighting, which amounts to 17.5mg for a standard 70kg adult).
+- $E_{max}$: Set to 90% (the maximum achievable range of transporter blockade).
+- <i>n</i> (Hill coefficient): Set to 1.35 to match curve steepness precisely with clinical data points (such as ~12% at 5mg and ~73% at 40mg).
 B) From occupancy to dopamine increase (Inverse-linear mechanism)
 - If a fraction O (e.g., 0.70 or 70%) of the transporters is occupied, an unoccupied fraction of 1-O remains to clear dopamine.
-- Clearance capacity drops inversely with occupancy. The multiplication factor for extracellular dopamine becomes 1/1-O.
+- Clearance capacity drops inversely with occupancy. The multiplication factor for extracellular dopamine becomes $1/{1-O}$.
 - Converted to a percentage increase relative to baseline (0% change):
 C) The inverted-U performance output: The calculated dopamine level is subsequently fed into a Gaussian-like performance function in the model.
 `
