@@ -33,6 +33,7 @@ aside h1 span{display:block;font:400 .85rem var(--sans);color:var(--side-mute);m
 .profile button:focus-visible{outline:2px solid var(--side-da);outline-offset:2px}
 .speed{font:500 .8rem var(--sans);padding:4px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:none;color:var(--side-ink);cursor:pointer}
 .speed:hover{border-color:var(--side-da)} .speed:focus-visible{outline:2px solid var(--side-da);outline-offset:2px}
+.sim{display:flex;flex-wrap:wrap;gap:6px}
 .ctl label{display:flex;justify-content:space-between;align-items:baseline;font-weight:500;margin-bottom:10px}
 .ctl output{font:600 1.7rem var(--serif);font-variant-numeric:tabular-nums}
 .ctl output small{font:400 .8rem var(--sans);color:var(--side-mute);margin-left:4px}
@@ -52,7 +53,7 @@ nav{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:16px
 nav button{font:500 1rem var(--sans);color:var(--mute);background:none;border:0;padding:4px 0 10px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
 nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--da)}
 nav button:focus-visible{outline:2px solid var(--da);outline-offset:2px}
-#models{position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;flex:1;min-height:0}
+#models{position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1.5fr 1fr;gap:16px;flex:1;min-height:0}
 .card{position:relative;background:var(--panel);border-radius:6px;padding:14px 18px 8px;display:flex;flex-direction:column;min-height:0;min-width:0}
 .card h2{font:600 1.05rem var(--serif);margin:0 0 2px;padding-right:34px}
 .card p{padding-right:34px;margin:0 0 6px;font-size:.8rem;line-height:1.35;color:var(--mute)}
@@ -96,7 +97,11 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
     <input id="da" type="range" min="0" max="200" step="1" value="60"></div>
   <div class="ctl"><label for="mph">Methylphenidate <output id="mphOut"></output></label>
     <input id="mph" type="range" min="0" max="60" step="1" value="10"></div>
-  <div><div class="cap">Simulation speed</div><button class="speed" id="speed" title="Speeds up the valley and ring models">Speed &times;1</button></div>
+  <div><div class="cap">Simulation</div><div class="sim">
+  <button class="speed" id="speed" title="Speed of the synapse, ring and valley models">Speed &times;1</button>
+  <button class="speed" id="pause">Pause</button>
+  <button class="speed" id="reset">Reset</button>
+</div></div>
 </aside>
 
 <div class="content">
@@ -119,7 +124,7 @@ const MODELS = [
   { file: 'models/model3.html', title: '4. Valley model', caption: 'Working memory can be seen like a ball in a valley.', height: 270 }
 ];
 
-const K = PKPD, params = { da: 60, mph: 10, profile: 'adhd', speed: 1 };
+const K = PKPD, params = { da: 60, mph: 10, profile: 'adhd', speed: 1, paused: false, reset: 0 };
 const THEME = ['--panel','--ink','--mute','--line','--da','--mph','--curve','--sans'];
 const frames = [], shared = {};
 
@@ -233,6 +238,10 @@ speedBtn.addEventListener('click', () => {
   sendAll();
 });
   
+const pauseBtn = document.getElementById('pause');
+pauseBtn.addEventListener('click', () => { params.paused = !params.paused; pauseBtn.textContent = params.paused ? 'Resume' : 'Pause'; sendAll(); });
+document.getElementById('reset').addEventListener('click', () => { params.reset++; sendAll(); });
+
 if (document.fonts) document.fonts.ready.then(sendAll);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(sendAll, 50));
 </script>
