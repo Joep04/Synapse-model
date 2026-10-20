@@ -53,9 +53,14 @@ nav{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:16px
 nav button{font:500 1rem var(--sans);color:var(--mute);background:none;border:0;padding:4px 0 10px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
 nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--da)}
 nav button:focus-visible{outline:2px solid var(--da);outline-offset:2px}
-#models{position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1.5fr 1fr;gap:16px;flex:1;min-height:0}
+#models{position:relative;display:grid;grid-template-columns:2fr 1fr;grid-template-rows:2fr 1fr;grid-template-areas:"main tall" "wide small";gap:16px;flex:1;min-height:0}
+.card[data-area=main]{grid-area:main} .card[data-area=tall]{grid-area:tall} .card[data-area=wide]{grid-area:wide} .card[data-area=small]{grid-area:small}
 .card{position:relative;background:var(--panel);border-radius:6px;padding:14px 18px 8px;display:flex;flex-direction:column;min-height:0;min-width:0}
 .card h2{font:600 1.05rem var(--serif);margin:0 0 2px;padding-right:34px}
+.card.main{border:2px solid var(--mph);padding:12px 16px 6px}
+.card.main h2{font-size:1.25rem}
+.card.main p{font-size:.88rem}
+.badge{font:600 .68rem var(--sans);letter-spacing:.04em;color:var(--mph);border:1px solid var(--mph);border-radius:999px;padding:1px 9px;margin-left:10px;vertical-align:middle;white-space:nowrap}
 .card p{padding-right:34px;margin:0 0 6px;font-size:.8rem;line-height:1.35;color:var(--mute)}
 /* info button + popup */
 .info{position:absolute;top:12px;right:14px;z-index:2;width:26px;height:26px;padding:0;border-radius:50%;border:1.5px solid var(--mute);background:none;color:var(--mute);font:italic 600 .95rem/1 var(--serif);cursor:pointer;display:grid;place-items:center}
@@ -63,19 +68,20 @@ nav button:focus-visible{outline:2px solid var(--da);outline-offset:2px}
 .info:focus-visible{outline:2px solid var(--da);outline-offset:2px}
 .card.open{box-shadow:0 0 0 2px var(--da)}
 #popup{position:absolute;top:0;bottom:0;width:calc(50% - 8px);z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 36px rgba(0,0,0,.28);padding:20px 22px;overflow-y:auto}
-#popup.right{left:calc(50% + 8px)} #popup.left{left:0}
+#popup.right{left:calc((100% - 16px) * 2 / 3 + 16px);width:calc((100% - 16px) / 3)} #popup.left{left:0;width:calc((100% - 16px) * 2 / 3)}
+#popup>*:not(.close){max-width:72ch}
 #popup h2{font:600 1.25rem var(--serif);margin:0 0 10px;padding-right:30px}
 #popup p{margin:0 0 1em}
 #popup .close{position:absolute;top:8px;right:12px;background:none;border:0;color:var(--mute);font-size:1.5rem;line-height:1;cursor:pointer}
 #popup .close:hover{color:var(--ink)}
 iframe{width:100%;border:0;display:block;flex:1;min-height:0}
-#about{max-width:68ch;overflow-y:auto;flex:1;min-height:0}
-#about h2{font:600 1.5rem var(--serif);margin:36px 0 8px}
-#about h2:first-child{margin-top:0}
+#about,#important{max-width:68ch;overflow-y:auto;flex:1;min-height:0}
+#about h2,#important h2{font:600 1.5rem var(--serif);margin:36px 0 8px}
+#about h2:first-child,#important h2:first-child{margin-top:0}
 .math{margin:.5em 0 1.1em;overflow-x:auto;overflow-y:hidden}
-#about ul,#about ol,#popup ul,#popup ol{margin:0 0 1em;padding-left:1.3em}
-#about li,#popup li{margin-bottom:.3em}
-#about p{margin:0 0 1em}
+#about ul,#about ol,#important ul,#important ol,#popup ul,#popup ol{margin:0 0 1em;padding-left:1.3em}
+#about li,#important li,#popup li{margin-bottom:.3em}
+#about p,#important p{margin:0 0 1em}
 [hidden]{display:none!important}
 @media (max-width:860px){
   body{grid-template-columns:1fr;height:auto;overflow:visible}
@@ -84,9 +90,14 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
   .content{padding:20px 16px;height:auto;display:block}
   #models{grid-template-columns:1fr;grid-template-rows:none;gap:16px}
   iframe{flex:none;height:300px}
-  #about{overflow:visible}
+  #about,#important{overflow:visible}
+  #models{grid-template-areas:none}
+  .card[data-area]{grid-area:auto}
+  .card.main{order:-1}
+  .card.main iframe{height:400px}
   #popup,#popup.left,#popup.right{position:fixed;top:auto;bottom:12px;left:12px;right:12px;width:auto;max-height:55vh}
 }
+@media (max-height:820px) and (min-width:861px){.card:not(.main) p{display:none}}
 </style>
 </head>
 <body>
@@ -108,9 +119,11 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
   <nav role="tablist">
     <button role="tab" id="tab-models" aria-selected="true">Models</button>
     <button role="tab" id="tab-about" aria-selected="false">About the models</button>
+    <button role="tab" id="tab-important" aria-selected="false">Important information</button>
   </nav>
   <main id="models" role="tabpanel"></main>
   <article id="about" role="tabpanel" hidden></article>
+  <article id="important" role="tabpanel" hidden></article>
 </div>
 
 <script src="content.js"></script>
@@ -118,10 +131,10 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
 <script src="bridge.js"></script>
 <script>
 const MODELS = [
-  { file: 'models/model1.html', title: '1. Synapse', caption: 'Dopamine is released from vesicles into the cleft; transporters take it back up (reuptake) and refill the vesicles. Purple = blocked.', height: 340 },
-  { file: 'models/model2.html', title: '2. Performance (inverted U)', caption: 'Dopamine and methylphenidate set working memory performance on an inverted U.', height: 270 },
-  { file: 'models/model4.html', title: '3. Ring attractor', caption: 'Neurons on a ring hold the memory as a bump of neuron firing.', height: 270 },
-  { file: 'models/model3.html', title: '4. Valley model', caption: 'Working memory can be seen like a ball in a valley.', height: 270 }
+  { file: 'models/model1.html', area: 'wide', title: '1. Synapse', caption: 'Dopamine is released from vesicles into the cleft; transporters take it back up (reuptake) and refill the vesicles. Purple = blocked.', height: 340 },
+  { file: 'models/model2.html', area: 'main', main: true, title: '2. Performance (inverted U)', caption: 'Dopamine and methylphenidate set working memory performance on an inverted U.', height: 270 },
+  { file: 'models/model4.html', area: 'tall', title: '3. Ring attractor', caption: 'Neurons on a ring hold the memory as a bump of neuron firing.', height: 270 },
+  { file: 'models/model3.html', area: 'small', title: '4. Valley model', caption: 'Working memory can be seen like a ball in a valley.', height: 270 }
 ];
 
 const K = PKPD, params = { da: 60, mph: 10, profile: 'adhd', speed: 1, paused: false, reset: 0 };
@@ -161,8 +174,8 @@ function typeset(el) {
 
 const main = document.getElementById('models'), cards = [], btns = [];
 MODELS.forEach(m => {
-  const c = document.createElement('section'); c.className = 'card';
-  c.innerHTML = `<h2>${m.title}</h2><p>${m.caption}</p><button class="info" aria-label="Info about ${m.title}" aria-expanded="false" title="About this model">i</button><iframe src="${m.file}" title="${m.title}"></iframe>`;
+  const c = document.createElement('section'); c.className = 'card' + (m.main ? ' main' : ''); c.dataset.area = m.area;
+  c.innerHTML = `<h2>${m.title}${m.main ? '<span class="badge">main model</span>' : ''}</h2><p>${m.caption}</p><button class="info" aria-label="Info about ${m.title}" aria-expanded="false" title="About this model">i</button><iframe src="${m.file}" title="${m.title}"></iframe>`;
   main.appendChild(c); cards.push(c); btns.push(c.querySelector('.info'));
   const f = c.querySelector('iframe'); frames.push(f);
   f.addEventListener('load', () => send(f));
@@ -181,7 +194,7 @@ function openInfo(i) {
   const x = CONTENT.models[i] || { title: MODELS[i].title, text: '' };
   popup.innerHTML = `<button class="close" aria-label="Close">&times;</button><h2>${x.title}</h2>${paragraphs(x.text)}`;
   typeset(popup);
-  popup.className = i % 2 === 0 ? 'right' : 'left';
+  popup.className = ['tall', 'small'].includes(MODELS[i].area) ? 'left' : 'right';   // open over the other column(s)
   popup.hidden = false; popup.scrollTop = 0;
   cards[i].classList.add('open'); btns[i].setAttribute('aria-expanded', 'true'); openIdx = i;
   popup.querySelector('.close').addEventListener('click', closeInfo);
@@ -192,8 +205,11 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo();
 document.getElementById('about').innerHTML =
   paragraphs(CONTENT.intro) + CONTENT.models.map(x => `<h2>${x.title}</h2>${paragraphs(x.text)}`).join('');
   typeset(document.getElementById('about'));
+document.getElementById('important').innerHTML =
+  (CONTENT.important || []).map(x => `<h2>${x.title}</h2>${paragraphs(x.text)}`).join('') || '<p>Add your text to <b>important</b> in content.js.</p>';
+typeset(document.getElementById('important'));
 
-const tabs = [['tab-models', 'models'], ['tab-about', 'about']];
+const tabs = [['tab-models', 'models'], ['tab-about', 'about'], ['tab-important', 'important']];
 tabs.forEach(([btn, panel]) => document.getElementById(btn).addEventListener('click', () => {
   tabs.forEach(([b, p]) => { document.getElementById(b).setAttribute('aria-selected', b === btn); document.getElementById(p).hidden = p !== panel; });
   closeInfo();
