@@ -97,6 +97,13 @@ iframe{width:100%;border:0;display:block;flex:1;min-height:0}
   .card.main iframe{height:400px}
   #popup,#popup.left,#popup.right{position:fixed;top:auto;bottom:12px;left:12px;right:12px;width:auto;max-height:55vh}
 }
+/* info mode (desktop): only the chosen model (left) and its text (right), kept inside the model area */
+@media (min-width:861px){
+  #models.reading{grid-template-columns:3fr 2fr;grid-template-rows:minmax(0,1fr);grid-template-areas:"model text"}
+  #models.reading .card:not(.open){position:absolute;left:-10000px;top:0;width:640px;height:400px;visibility:hidden;pointer-events:none}
+  #models.reading .card.open{grid-area:model}
+  #models.reading #popup{position:relative;top:auto;bottom:auto;left:auto;width:auto;grid-area:text;min-height:0;box-shadow:none}
+}
 @media (max-height:820px) and (min-width:861px){.card:not(.main) p{display:none}}
 </style>
 </head>
@@ -187,6 +194,7 @@ let openIdx = -1;
 function closeInfo() {
   if (openIdx < 0) return;
   popup.hidden = true; cards[openIdx].classList.remove('open'); btns[openIdx].setAttribute('aria-expanded', 'false'); openIdx = -1;
+  main.classList.remove('reading'); setTimeout(sendAll, 60);
 }
 function openInfo(i) {
   if (openIdx === i) { closeInfo(); return; }
@@ -194,7 +202,8 @@ function openInfo(i) {
   const x = CONTENT.models[i] || { title: MODELS[i].title, text: '' };
   popup.innerHTML = `<button class="close" aria-label="Close">&times;</button><h2>${x.title}</h2>${paragraphs(x.text)}`;
   typeset(popup);
-  popup.className = ['tall', 'small'].includes(MODELS[i].area) ? 'left' : 'right';   // open over the other column(s)
+  main.classList.add('reading');   // info mode: only this model (left) and its text (right) are shown
+  setTimeout(sendAll, 60);
   popup.hidden = false; popup.scrollTop = 0;
   cards[i].classList.add('open'); btns[i].setAttribute('aria-expanded', 'true'); openIdx = i;
   popup.querySelector('.close').addEventListener('click', closeInfo);
