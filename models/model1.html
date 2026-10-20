@@ -9,11 +9,20 @@ canvas{position:absolute;inset:0}
 .key i{display:inline-block;width:9px;height:9px}
 .stats{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .stat{background:rgba(127,140,145,.14);border-radius:6px;padding:4px 9px;font-size:11px;line-height:1.3;color:var(--mute)}
+.side{flex:none;display:flex;flex-direction:column;gap:6px}
+.stat em{font-style:normal}
+body.wide{flex-direction:row;gap:10px}
+body.wide .wrap{flex:1 1 0;min-width:0}
+body.wide .side{flex:0 0 min(300px,42%);min-height:0;overflow-y:auto}
+body.wide .stats{grid-template-columns:1fr;gap:4px}
+body.wide .stat{display:flex;justify-content:space-between;align-items:baseline;padding:3px 9px}
+body.wide .stat br,body.wide .stat em{display:none}
 .stat strong{font-size:17px;font-weight:600;color:var(--ink);margin-right:4px}
 #explanation{flex:none;margin:0;font-size:11.5px;line-height:1.35;color:var(--mute)}
 </style></head>
 <body>
 <div class="wrap"><canvas id="c"></canvas></div>
+<div class="side">
 <div class="legend">
   <span class="key"><i style="border-radius:50%;background:var(--da)"></i>Dopamine</span>
   <span class="key"><i style="border-radius:50%;background:var(--mph)"></i>Methylphenidate</span>
@@ -22,11 +31,12 @@ canvas{position:absolute;inset:0}
   <span class="key"><i style="border-radius:50%;border:1.5px solid var(--da);width:7px;height:7px"></i>Vesicle</span>
 </div>
 <div class="stats">
-  <div class="stat">Dopamine in cleft<br><strong id="daN">0</strong>visible molecules</div>
-  <div class="stat">DAT blocked<br><strong id="blkN">0 / 12</strong>occupied by MPH</div>
-  <div class="stat">Dopamine reuptake<br><strong id="upN">0</strong>uptake events</div>
+  <div class="stat"><span>Dopamine in cleft</span><br><strong id="daN">0</strong><em>visible molecules</em></div>
+  <div class="stat"><span>DAT blocked</span><br><strong id="blkN">0 / 12</strong><em>occupied by MPH</em></div>
+  <div class="stat"><span>Dopamine reuptake</span><br><strong id="upN">0</strong><em>uptake events</em></div>
 </div>
 <p id="explanation"></p>
+</div>
 <script>
 const c = document.getElementById('c'), g = c.getContext('2d'), K = PKPD;
 
@@ -189,6 +199,7 @@ function stats() {
 
 function loop(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  document.body.classList.toggle('wide', innerWidth / innerHeight > 2.1);   // wide and short panel: text next to the picture
   if (fit() && col['--da']) {
     cur = K.compute(P.da, P.mph, P.profile);
     if (!P.paused) {   // pause / speed / reset come from the sidebar
