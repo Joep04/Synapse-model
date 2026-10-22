@@ -125,7 +125,7 @@ How does dopamine connect to this? A deep valley essentially represents a relati
 
 `
     }
-  ]
+  ],
   important: [
     { title: "Title of section 1", text: String.raw`
 Write the important information here. One line is one paragraph.
