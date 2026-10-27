@@ -128,12 +128,34 @@ How does dopamine connect to this? A deep valley essentially represents a relati
   ],
   important: [
     { title: "Limitations", text: String.raw`
-Information here. One line is one paragraph.
-- Lines starting with "- " become bullets.
+Limitations of the concept:
+- Dopamine hypothesis: ADHD is more complex than low dopamine levels. It is a heterogeneous neurodevelopmental disorder, meaning that its underlying mechanisms differ between individuals. Dopamine is involved in ADHD, however the disorder cannot simply be explained by reduced dopamine levels. Therefore, using a low dopamine baseline as representation of ADHD is a simplification and does not accurately represent every individual with ADHD.
+- DAT as sole influence on dopamine and PFC: Methylphenidate also blocks norepinephrine transporters (NET). They can also influence the PFC function, including working memory. By focusing primarily on methylphenidate’s effect on dopamine reuptake, the model does not capture the full complexity of the drug. Additionally the model assumes that blocking DAT increases dopamine levels. However, dopamine signaling is regulated by several mechanisms and not only reuptake. 
+- Cognitive performance represented as working memory: The model only uses working-memory performance as a measurement for cognitive functioning. However, methylphenidate can influence several cognitive processes. That the drug causes one cognitive domain to improve does not necessarily indicate an improvement in others. Thus, the model cannot provide a clear view of the medication’s overall cognitive effect. 
+
+Limitations of the inverted-U curve:
+While this model provides a mathematically grounded bridge between dose, transporter occupancy, and cognitive performance, several important biological limitations must be acknowledged.
+- Inter-Individual Variability in Baseline Dopamine: Every individual possesses a unique baseline dopamine tone determined by genetics, baseline enzyme activity, and receptor density. Because the therapeutic effect of methylphenidate relies heavily on what baseline dopamine is already present, the exact same dose can produce optimal focus in one person and over-stimulation or anxiety in another.
+- Scarcity of Direct Human Dopamine Concentration Data from Transporter Blockers: While PET imaging reliably measures transporter occupancy in humans, translating that specific percentage of blocked transporters into a precise, real-time change in extracellular dopamine concentration remains challenging. Direct measurement techniques for dynamic neurotransmitter surges are mostly restricted to animal studies, meaning the exact mapping from transporter blockade to dopamine concentration involves theoretical modeling assumptions.
+- Pleiotropic Network Effects: Dopamine does not act in a vacuum. It interacts dynamically with noradrenaline, glutamate (NMDA), and GABA networks across multiple interconnected brain regions. Because dopamine broadly influences signal-to-noise ratios, arousal, and motivation, real-world cognitive performance is shaped by complex multi-system feedback loops that a single U-curve cannot fully capture.
+
+Limitations of the ring attractor and valley model:
+- Theoretical explanations: Both models provide a simplified explanation of how working-memory is represented and how stable these representations are. Actual working-memory involves complex neural networks and interaction between multiple brain regions. The relationship between dopamine levels, neural activity, and memory stability is more complex than the model suggest. 
+
 ` },
-    { title: "Links", text: String.raw`
-Information here. One line is one paragraph.
-- Lines starting with "- " become bullets.
+    { title: "Sources", text: String.raw`
+Sources for the biological background:
+- Dopamine: Cleveland Clinic. (2020, March 23). Dopamine: What it is, function & symptoms. https://my.clevelandclinic.org/health/articles/22581-dopamine 
+- Dopmaine and ADHD: 
+MacDonald, H. j., Kleppe, R., Szigetvari, P. D., & Haavik, J. (2024). The dopamine hypothesis for ADHD: An evaluation of evidence accumulated from human studies and animal models. Frontiers in Psychiatry. https://pubmed.ncbi.nlm.nih.gov/39619336/ 
+The Open University. (2021, March 2). Candidate genes and dopamine. OpenLearn. https://www.open.edu/openlearn/health-sports-psychology/understanding-adhd/content-section-2.1.3 
+- Reuptake: Reuptake. (n.d.). In Wikipedia. Retrieved October 27, 2026 from https://en.wikipedia.org/wiki/Reuptake 
+- Methylfenidate: Guzmán, F. (2015, January 23). Methylphenidate for ADHD: Mechanisms of action and formulations. Psychopharmacology Institute. https://psychopharmacologyinstitute.com/publication/methylphenidate-for-adhd-mechanism-of-action-and-formulations-2194/ 
+
+Sources for the models:
+- Brunel, N. (2000). Dynamics of sparsely connected networks of excitatory and inhibitory spiking neurons. Journal of Neurophysiology. https://journals.physiology.org/doi/full/10.1152/jn.2000.83.3.1733
+- Compte, A., Burnel N., Goldman-Rakic, P. S., & Wang, X. (2000, September). Synaptic Mechanisms and Network Dynamics Underlying Spatial Working Memory in a Cortical Network Model. Oxford University Press. 
+- Cools, R., & D’Esposito, M. (2011). Inverted-U-shaped dopamine actions on human working memory and cognitive control. Biological Psychiatry. https://pmc.ncbi.nlm.nih.gov/articles/PMC3111448/#R8
 ` }
   ]
 };
