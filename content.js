@@ -146,9 +146,9 @@ Limitations of the ring attractor and valley model:
     { title: "Sources", text: String.raw`
 Sources for the biological background:
 - <b>Dopamine:</b> Cleveland Clinic. (2020, March 23). Dopamine: What it is, function & symptoms. https://my.clevelandclinic.org/health/articles/22581-dopamine 
-- <b>Dopmaine and ADHD:</b> MacDonald, H. j., Kleppe, R., Szigetvari, P. D., & Haavik, J. (2024). The dopamine hypothesis for ADHD: An evaluation of evidence accumulated from human studies and animal models. Frontiers in Psychiatry. https://pubmed.ncbi.nlm.nih.gov/39619336/ & The Open University. (2021, March 2). Candidate genes and dopamine. OpenLearn. https://www.open.edu/openlearn/health-sports-psychology/understanding-adhd/content-section-2.1.3 
+- <b>Dopamine and ADHD:</b> MacDonald, H. j., Kleppe, R., Szigetvari, P. D., & Haavik, J. (2024). The dopamine hypothesis for ADHD: An evaluation of evidence accumulated from human studies and animal models. Frontiers in Psychiatry. https://pubmed.ncbi.nlm.nih.gov/39619336/ & The Open University. (2021, March 2). Candidate genes and dopamine. OpenLearn. https://www.open.edu/openlearn/health-sports-psychology/understanding-adhd/content-section-2.1.3 
 - <b>Reuptake:</b> Reuptake. (n.d.). In Wikipedia. Retrieved October 27, 2026 from https://en.wikipedia.org/wiki/Reuptake 
-- <b>Methylfenidate:</b> Guzmán, F. (2015, January 23). Methylphenidate for ADHD: Mechanisms of action and formulations. Psychopharmacology Institute. https://psychopharmacologyinstitute.com/publication/methylphenidate-for-adhd-mechanism-of-action-and-formulations-2194/ 
+- <b>Methylphenidate:</b> Guzmán, F. (2015, January 23). Methylphenidate for ADHD: Mechanisms of action and formulations. Psychopharmacology Institute. https://psychopharmacologyinstitute.com/publication/methylphenidate-for-adhd-mechanism-of-action-and-formulations-2194/ 
 
 Sources for the models:
 - Brunel, N. (2000). Dynamics of sparsely connected networks of excitatory and inhibitory spiking neurons. Journal of Neurophysiology. https://journals.physiology.org/doi/full/10.1152/jn.2000.83.3.1733
